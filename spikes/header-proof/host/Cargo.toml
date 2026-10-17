@@ -1,0 +1,14 @@
+[package]
+name = "zylem-hdr-host"
+description = "Measures cycles and proving time for the header-chain guest on real testnet headers"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[dependencies]
+zylem-hdr = { path = "../core" }
+zylem-hdr-validate = { path = "../validate" }
+zylem-hdr-methods = { path = "../methods" }
+risc0-zkvm = "=3.0.6"
+anyhow = "1"
+hex = "0.4"

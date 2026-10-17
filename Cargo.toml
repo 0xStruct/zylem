@@ -6,6 +6,8 @@ members = [
     "crates/zylem-build",
     "crates/zylem-proxy",
 ]
+# Spikes have their own workspaces and toolchains.
+exclude = ["spikes"]
 
 [workspace.package]
 version = "0.0.1"

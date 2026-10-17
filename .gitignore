@@ -1,2 +1,4 @@
 /target/
 /data/
+/spikes/*/target/
+/spikes/*/methods/guest/target/

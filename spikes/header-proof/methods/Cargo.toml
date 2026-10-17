@@ -1,0 +1,11 @@
+[package]
+name = "zylem-hdr-methods"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+risc0-build = "=3.0.6"
+
+[package.metadata.risc0]
+methods = ["guest"]
