@@ -1,0 +1,18 @@
+[package]
+name = "zylem-hdr-sp1"
+description = "Measures the header-chain program in SP1 on the same headers as the RISC Zero host"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[dependencies]
+sp1-sdk = { version = "=6.9.0", features = ["blocking", "network"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+rand = "0.8"
+zylem-hdr = { path = "../../core" }
+zylem-hdr-validate = { path = "../../validate" }
+anyhow = "1"
+hex = "0.4"
+
+[build-dependencies]
+sp1-build = "=6.9.0"

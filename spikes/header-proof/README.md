@@ -94,3 +94,43 @@ cargo run --release -p zylem-hdr-validate -- ../../data/testnet   # native, all 
 cargo run --release -p zylem-hdr-host -- ../../data/testnet       # cycles
 cargo run --release -p zylem-hdr-host -- ../../data/testnet --prove 100
 ```
+
+## SP1 comparison
+
+`sp1/` runs the same rules crate (`core/`) in SP1 6.9.0, on the same 100 testnet
+headers from height 4,494,811, with SP1's patched SHA-256. Its output equals the native
+run's for every batch. Measured on the same M2 Pro, CPU only:
+
+| | RISC Zero 3.0.6 | SP1 6.9.0 |
+|---|---|---|
+| Per header, no Equihash | 68,790 cycles | 29,592 instructions / 41,301 prover gas |
+| Per header, with Equihash | 5,442,293 cycles | 3,975,314 instructions / 3,515,391 prover gas |
+| Prove 100 headers, no Equihash | 1,196 s | 146 s |
+| Peak memory for that proof | about 2.2 GB (r0vm) | 7.1 GB |
+| Proof | 222,668 B succinct seal | 1,272,782 B saved compressed proof (includes public values and metadata) |
+
+Cycles, instructions and prover gas are different units, so compare proving time and
+price, not the counts. Equihash costs fewer instructions in SP1, plausibly because it
+runs 64-bit RISC-V and BLAKE2b is 64-bit arithmetic; RISC Zero runs 32-bit. Neither
+zkVM has a BLAKE2b precompile.
+
+**Cost per 4,096-block Ring**, from the measured counts and each network's price:
+
+| | RISC Zero on Boundless ($0.17–0.30 per billion cycles, explorer snapshot, undated) | SP1 on the Succinct network ($0.120 per billion prover gas, live market price 2026-10-21: 0.633 PROVE per billion at $0.189) |
+|---|---|---|
+| No Equihash | $0.05–0.08 | $0.02 |
+| With Equihash | $3.79–6.69 | $1.73 |
+| One day of NU7 mainnet with Equihash (3,456 blocks) | $3.20–5.64 | $1.46 |
+| All history since NU5 with Equihash (about 1.84M blocks) | about $1,700–3,000 | about $780 |
+
+SP1 figures exclude the network's per-request base fee, which I did not find
+published. `cargo run --release -p zylem-hdr-sp1 --bin market` prints the current price.
+
+Run (needs `sp1up`, and `protoc` on the PATH or in `PROTOC`):
+
+```bash
+cd sp1
+cargo run --release -p zylem-hdr-sp1 -- ../../../data/testnet               # counts
+cargo run --release -p zylem-hdr-sp1 -- ../../../data/testnet --prove 100   # proof
+cargo run --release -p zylem-hdr-sp1 --bin market                           # price
+```
