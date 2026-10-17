@@ -1,0 +1,31 @@
+[package]
+name = "zylem-build"
+description = "Builds, verifies and serves Zylem Rings from a Zakura or Zebra node"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+zylem-proto.workspace = true
+zylem-core.workspace = true
+zcash_primitives.workspace = true
+zcash_protocol.workspace = true
+orchard.workspace = true
+incrementalmerkletree.workspace = true
+prost.workspace = true
+tonic = { workspace = true, features = ["tls-ring", "tls-webpki-roots"] }
+tokio.workspace = true
+tokio-stream.workspace = true
+futures = "0.3"
+reqwest.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+hex.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+blake2b_simd.workspace = true

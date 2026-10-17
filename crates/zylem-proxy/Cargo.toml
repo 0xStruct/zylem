@@ -1,0 +1,26 @@
+[package]
+name = "zylem-proxy"
+description = "A drop-in light-wallet server that serves only data it has verified against block headers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+zylem-proto.workspace = true
+zylem-core.workspace = true
+zcash_primitives.workspace = true
+zcash_protocol.workspace = true
+prost.workspace = true
+tonic = { workspace = true, features = ["tls-ring", "tls-webpki-roots"] }
+tokio = { workspace = true, features = ["signal"] }
+tokio-stream = { workspace = true, features = ["net"] }
+futures = "0.3"
+reqwest.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+hex.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

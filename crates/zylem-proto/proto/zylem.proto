@@ -1,0 +1,75 @@
+// Zylem Ring format, version 1.
+//
+// A Ring is one epoch of chain history that any client can check against block
+// headers: headers, every transaction of every block in compact form, and the
+// auxiliary digests that rebuild each transaction ID from that compact form.
+
+syntax = "proto3";
+package zylem.v1;
+import "compact_formats.proto";
+
+// Everything a transaction ID hashes outside the compact part of the transaction
+// (ZIP 244 for v5, ZIP 229 for v6). A v4 transaction has no compact split, so it
+// carries its full bytes instead.
+message TxAux {
+    uint32 version = 1;              // 4, 5 or 6
+    uint32 branch_id = 2;            // consensus branch ID from the v5/v6 header
+    bytes header_digest = 3;         // T.1
+    bytes transparent_sequence_digest = 4; // T.2b; prevouts and outputs come from vin/vout
+    SaplingAux sapling = 5;          // absent: no Sapling bundle
+    ActionsAux orchard = 6;          // absent: no Orchard bundle
+    ActionsAux ironwood = 7;         // absent: no Ironwood bundle (v6 only)
+    bytes full_tx = 8;               // v4 only
+    bool has_transparent = 9;        // the transparent bundle is present
+}
+
+message SaplingAux {
+    bytes spends_noncompact_digest = 1;  // present when there are spends
+    bytes outputs_memos_digest = 2;      // present when there are outputs
+    bytes outputs_noncompact_digest = 3; // present when there are outputs
+    int64 value_balance = 4;
+}
+
+message ActionsAux {
+    bytes memos_digest = 1;
+    bytes noncompact_digest = 2;
+    uint32 flags = 3;
+    int64 value_balance = 4;
+    bytes anchor = 5;                // v5 Orchard only; v6 commits the anchor in the auth digest
+}
+
+message RingBlock {
+    bytes header = 1;                // the full 1,487-byte block header
+    cash.z.wallet.sdk.rpc.CompactBlock block = 2; // every transaction, all pools, in block order
+    repeated TxAux aux = 3;          // one per transaction, same order
+    bytes auth_data_root = 4;        // ZIP 244 hashAuthDataRoot
+    bytes sapling_root = 5;          // note commitment tree roots after this block
+    bytes orchard_root = 6;
+    bytes ironwood_root = 7;
+}
+
+message HistoryPeak {
+    uint32 index = 1;
+    bytes entry = 2;                 // zcash_history Entry encoding
+}
+
+// Chain state just before the Ring's first block.
+message RingStart {
+    bytes sapling_frontier = 1;      // zcash_primitives frontier v1 encoding
+    bytes orchard_frontier = 2;
+    bytes ironwood_frontier = 3;
+    uint32 history_length = 4;       // nodes in the history tree
+    uint32 history_branch_id = 5;
+    repeated HistoryPeak history_peaks = 6;
+}
+
+message Ring {
+    uint32 format = 1;
+    string network = 2;
+    uint64 start_height = 3;
+    uint64 end_height = 4;           // inclusive
+    RingStart start = 5;
+    repeated RingBlock blocks = 6;
+    bytes next_header = 7;           // header of end_height + 1; absent for the open tail
+    bytes next_auth_data_root = 8;
+}

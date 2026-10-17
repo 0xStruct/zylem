@@ -1,0 +1,17 @@
+[package]
+name = "zylem-proto"
+description = "Light-wallet protocol types and gRPC stubs, plus the Zylem Ring format"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+prost.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+
+[build-dependencies]
+protox = "0.9"
+tonic-prost-build = "0.14"
