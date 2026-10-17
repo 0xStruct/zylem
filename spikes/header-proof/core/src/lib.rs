@@ -395,3 +395,123 @@ mod tests {
         assert_eq!(div_small_512(wide, 97), x);
     }
 }
+
+/// The running state a chain of segment proofs publishes. Each link verifies the previous
+/// link's proof, checks that its own headers continue from this state, and publishes the
+/// extended state. A client accepts the chain when `vk` is the program it trusts and the
+/// checkpoint fields are a block it trusts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChainState {
+    /// Digest of the verification key of the program that made every link.
+    pub vk: [u32; 8],
+    /// The block the chain starts after.
+    pub checkpoint_height: u64,
+    pub checkpoint_hash: [u8; 32],
+    pub checkpoint_context_hash: [u8; 32],
+    pub last_height: u64,
+    pub last_hash: [u8; 32],
+    /// Total work of every proven header, big-endian.
+    pub work: [u8; 32],
+    pub end_context_hash: [u8; 32],
+    /// SHA-256 chain over each segment's records hash.
+    pub records_acc: [u8; 32],
+    pub segments: u32,
+    /// True only if every segment checked Equihash.
+    pub equihash_checked: bool,
+}
+
+pub const CHAIN_STATE_SIZE: usize = 32 + 8 + 32 + 32 + 8 + 32 + 32 + 32 + 32 + 4 + 1;
+
+impl ChainState {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(CHAIN_STATE_SIZE);
+        for w in self.vk {
+            out.extend_from_slice(&w.to_le_bytes());
+        }
+        out.extend_from_slice(&self.checkpoint_height.to_le_bytes());
+        out.extend_from_slice(&self.checkpoint_hash);
+        out.extend_from_slice(&self.checkpoint_context_hash);
+        out.extend_from_slice(&self.last_height.to_le_bytes());
+        out.extend_from_slice(&self.last_hash);
+        out.extend_from_slice(&self.work);
+        out.extend_from_slice(&self.end_context_hash);
+        out.extend_from_slice(&self.records_acc);
+        out.extend_from_slice(&self.segments.to_le_bytes());
+        out.push(self.equihash_checked as u8);
+        out
+    }
+
+    pub fn decode(b: &[u8]) -> Option<Self> {
+        if b.len() != CHAIN_STATE_SIZE {
+            return None;
+        }
+        let a32 = |at: usize| -> [u8; 32] { b[at..at + 32].try_into().unwrap() };
+        let u64_at = |at: usize| u64::from_le_bytes(b[at..at + 8].try_into().unwrap());
+        let mut vk = [0u32; 8];
+        for (i, w) in vk.iter_mut().enumerate() {
+            *w = u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap());
+        }
+        Some(ChainState {
+            vk,
+            checkpoint_height: u64_at(32),
+            checkpoint_hash: a32(40),
+            checkpoint_context_hash: a32(72),
+            last_height: u64_at(104),
+            last_hash: a32(112),
+            work: a32(144),
+            end_context_hash: a32(176),
+            records_acc: a32(208),
+            segments: u32::from_le_bytes(b[240..244].try_into().unwrap()),
+            equihash_checked: b[244] == 1,
+        })
+    }
+
+    /// The state after one more proven segment. `prev` is `None` for the first segment,
+    /// whose anchor becomes the chain's checkpoint.
+    pub fn extend(prev: Option<&ChainState>, vk: [u32; 8], input: &Input, out: &Output) -> ChainState {
+        let (checkpoint_height, checkpoint_hash, checkpoint_context_hash, work, acc, segments, eq) = match prev {
+            Some(p) => (
+                p.checkpoint_height,
+                p.checkpoint_hash,
+                p.checkpoint_context_hash,
+                U256::from_big_endian(&p.work),
+                p.records_acc,
+                p.segments,
+                p.equihash_checked,
+            ),
+            None => (input.first_height - 1, input.anchor_hash, out.context_hash, U256::zero(), [0u8; 32], 0, true),
+        };
+        let mut total = [0u8; 32];
+        (work + U256::from_big_endian(&out.work)).to_big_endian(&mut total);
+        let mut h = Sha256::new();
+        h.update(acc);
+        h.update(out.records_hash);
+        ChainState {
+            vk,
+            checkpoint_height,
+            checkpoint_hash,
+            checkpoint_context_hash,
+            last_height: out.last_height,
+            last_hash: out.last_hash,
+            work: total,
+            end_context_hash: out.end_context_hash,
+            records_acc: h.finalize().into(),
+            segments: segments + 1,
+            equihash_checked: eq && out.equihash_checked,
+        }
+    }
+
+    /// Why a segment cannot continue this state, if it cannot.
+    pub fn continues(&self, input: &Input) -> Result<(), &'static str> {
+        if input.anchor_hash != self.last_hash {
+            return Err("segment does not start at the previous segment's last block");
+        }
+        if input.first_height != self.last_height + 1 {
+            return Err("segment height does not follow the previous segment");
+        }
+        if context_hash(&input.context) != self.end_context_hash {
+            return Err("segment's difficulty context differs from the previous segment's end");
+        }
+        Ok(())
+    }
+}

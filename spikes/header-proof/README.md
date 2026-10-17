@@ -134,3 +134,48 @@ cargo run --release -p zylem-hdr-sp1 -- ../../../data/testnet               # co
 cargo run --release -p zylem-hdr-sp1 -- ../../../data/testnet --prove 100   # proof
 cargo run --release -p zylem-hdr-sp1 --bin market                           # price
 ```
+
+## Proof chaining in SP1
+
+`sp1/link` is one link of a chain: it reads its own verification-key digest, the
+previous link's published state (empty for the first link) and a segment of headers. It
+verifies the previous link's compressed proof inside the zkVM with `verify_sp1_proof`,
+which binds that proof to this program's key and to exactly those state bytes, checks
+the new headers continue from that state (last hash, next height, difficulty context),
+proves them, and publishes the extended 245-byte state (`ChainState` in `core/`): key
+digest, checkpoint, last height and hash, total work, end context, a hash chained over
+every segment's records, and the segment count. A client accepts the newest proof if it
+verifies, its key digest is the program the client trusts, and its checkpoint is a block
+the client trusts.
+
+Two linked segments of 100 headers each (heights 4,494,811 to 4,495,010), M2 Pro CPU:
+
+| | Link 1 (starts at the checkpoint) | Link 2 (verifies link 1) |
+|---|---|---|
+| Instructions | 2,996,580 | 4,253,330 |
+| Proving time, compressed | 134.1 s | 193.9 s |
+| Saved proof | 1,272,814 B | 1,272,814 B |
+
+The proof does not grow: two links are the same size as one. Verifying the previous
+link added 59.7 s of proving on this CPU; that cost is per link, not per header, so on
+4,096-header segments it is small next to the headers themselves.
+
+Broken links (`cargo run --release -p zylem-hdr-sp1 --bin chain -- --broken-only`):
+
+| Attempt | Result |
+|---|---|
+| Next segment skips a block | guest exits with code 1 |
+| Link claims a different program key | guest exits with code 1 |
+| Previous state altered (inflated work) | executes, but proving fails: no proof matches the altered state |
+
+A guest that panics ends with a non-zero exit code rather than an error, so a client
+must require exit code 0 (SP1's `verify` does by default), and SP1's recursion asserts
+that any proof verified inside a link exited with code 0 (`sp1-recursion-circuit`
+`machine/deferred.rs`). Execution alone does not check proofs passed into a link; only
+proving does.
+
+```bash
+cd sp1
+cargo run --release -p zylem-hdr-sp1 --bin chain -- ../../../data/testnet               # two links
+cargo run --release -p zylem-hdr-sp1 --bin chain -- ../../../data/testnet --broken-only # rejections
+```
