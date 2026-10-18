@@ -515,3 +515,155 @@ impl ChainState {
         Ok(())
     }
 }
+
+/// A proven claim about a contiguous range of headers, published by a leaf (one segment
+/// of headers) or by an aggregation of two adjacent claims. Aggregations nest, so one
+/// claim can cover any number of leaves proved in parallel.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RangeClaim {
+    /// Key digest of the leaf program every leaf in the range was proved with. Zero in a
+    /// leaf's own claim (a program cannot know its own key); the aggregator fills it in.
+    pub leaf_vk: [u32; 8],
+    /// Key digest of the aggregation program. Zero in a leaf's claim.
+    pub agg_vk: [u32; 8],
+    pub first_height: u64,
+    /// Hash of the block before `first_height`.
+    pub anchor_hash: [u8; 32],
+    /// Difficulty context the range started from.
+    pub start_context_hash: [u8; 32],
+    pub last_height: u64,
+    pub last_hash: [u8; 32],
+    pub end_context_hash: [u8; 32],
+    /// Total work, big-endian.
+    pub work: [u8; 32],
+    /// A leaf's records hash, or SHA-256(0x01 || left root || right root).
+    pub records_root: [u8; 32],
+    pub leaves: u32,
+    pub equihash_checked: bool,
+}
+
+pub const RANGE_CLAIM_SIZE: usize = 32 + 32 + 8 + 32 + 32 + 8 + 32 + 32 + 32 + 32 + 4 + 1;
+
+/// Why two claims cannot be combined.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Join {
+    NotAdjacent,
+    HeightGap,
+    ContextMismatch,
+    MixedPrograms,
+}
+
+fn vk_bytes(vk: &[u32; 8], out: &mut Vec<u8>) {
+    for w in vk {
+        out.extend_from_slice(&w.to_le_bytes());
+    }
+}
+
+fn vk_from(b: &[u8]) -> [u32; 8] {
+    let mut vk = [0u32; 8];
+    for (i, w) in vk.iter_mut().enumerate() {
+        *w = u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap());
+    }
+    vk
+}
+
+impl RangeClaim {
+    /// A leaf's claim about the segment it proved.
+    pub fn leaf(input: &Input, out: &Output) -> Self {
+        RangeClaim {
+            leaf_vk: [0; 8],
+            agg_vk: [0; 8],
+            first_height: input.first_height,
+            anchor_hash: input.anchor_hash,
+            start_context_hash: out.context_hash,
+            last_height: out.last_height,
+            last_hash: out.last_hash,
+            end_context_hash: out.end_context_hash,
+            work: out.work,
+            records_root: out.records_hash,
+            leaves: 1,
+            equihash_checked: out.equihash_checked,
+        }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.leaves == 1 && self.leaf_vk == [0; 8] && self.agg_vk == [0; 8]
+    }
+
+    /// The claim covering `left` followed directly by `right`.
+    pub fn join(left: &Self, right: &Self, leaf_vk: [u32; 8], agg_vk: [u32; 8]) -> Result<Self, Join> {
+        if right.anchor_hash != left.last_hash {
+            return Err(Join::NotAdjacent);
+        }
+        if right.first_height != left.last_height + 1 {
+            return Err(Join::HeightGap);
+        }
+        if right.start_context_hash != left.end_context_hash {
+            return Err(Join::ContextMismatch);
+        }
+        for c in [left, right] {
+            if !c.is_leaf() && (c.leaf_vk != leaf_vk || c.agg_vk != agg_vk) {
+                return Err(Join::MixedPrograms);
+            }
+        }
+        let mut work = [0u8; 32];
+        (U256::from_big_endian(&left.work) + U256::from_big_endian(&right.work)).to_big_endian(&mut work);
+        let mut h = Sha256::new();
+        h.update([0x01]);
+        h.update(left.records_root);
+        h.update(right.records_root);
+        Ok(RangeClaim {
+            leaf_vk,
+            agg_vk,
+            first_height: left.first_height,
+            anchor_hash: left.anchor_hash,
+            start_context_hash: left.start_context_hash,
+            last_height: right.last_height,
+            last_hash: right.last_hash,
+            end_context_hash: right.end_context_hash,
+            work,
+            records_root: h.finalize().into(),
+            leaves: left.leaves + right.leaves,
+            equihash_checked: left.equihash_checked && right.equihash_checked,
+        })
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(RANGE_CLAIM_SIZE);
+        vk_bytes(&self.leaf_vk, &mut out);
+        vk_bytes(&self.agg_vk, &mut out);
+        out.extend_from_slice(&self.first_height.to_le_bytes());
+        out.extend_from_slice(&self.anchor_hash);
+        out.extend_from_slice(&self.start_context_hash);
+        out.extend_from_slice(&self.last_height.to_le_bytes());
+        out.extend_from_slice(&self.last_hash);
+        out.extend_from_slice(&self.end_context_hash);
+        out.extend_from_slice(&self.work);
+        out.extend_from_slice(&self.records_root);
+        out.extend_from_slice(&self.leaves.to_le_bytes());
+        out.push(self.equihash_checked as u8);
+        out
+    }
+
+    pub fn decode(b: &[u8]) -> Option<Self> {
+        if b.len() != RANGE_CLAIM_SIZE {
+            return None;
+        }
+        let a32 = |at: usize| -> [u8; 32] { b[at..at + 32].try_into().unwrap() };
+        let u64_at = |at: usize| u64::from_le_bytes(b[at..at + 8].try_into().unwrap());
+        Some(RangeClaim {
+            leaf_vk: vk_from(&b[0..32]),
+            agg_vk: vk_from(&b[32..64]),
+            first_height: u64_at(64),
+            anchor_hash: a32(72),
+            start_context_hash: a32(104),
+            last_height: u64_at(136),
+            last_hash: a32(144),
+            end_context_hash: a32(176),
+            work: a32(208),
+            records_root: a32(240),
+            leaves: u32::from_le_bytes(b[272..276].try_into().unwrap()),
+            equihash_checked: b[276] == 1,
+        })
+    }
+}

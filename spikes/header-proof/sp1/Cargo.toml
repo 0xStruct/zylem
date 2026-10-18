@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["program", "link", "script"]
+members = ["program", "link", "leaf", "agg", "script"]
 
 [patch.crates-io]
 # SP1's SHA-256 precompile (native builds fall back to the plain implementation).

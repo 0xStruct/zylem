@@ -1,4 +1,5 @@
 fn main() {
-    sp1_build::build_program_with_args("../program", Default::default());
-    sp1_build::build_program_with_args("../link", Default::default());
+    for program in ["../program", "../link", "../leaf", "../agg"] {
+        sp1_build::build_program_with_args(program, Default::default());
+    }
 }

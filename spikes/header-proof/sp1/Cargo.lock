@@ -3352,6 +3352,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "header-chain-agg"
+version = "0.0.1"
+dependencies = [
+ "sha2 0.10.8",
+ "sp1-zkvm",
+ "zylem-hdr",
+]
+
+[[package]]
+name = "header-chain-leaf"
+version = "0.0.1"
+dependencies = [
+ "sp1-zkvm",
+ "zylem-hdr",
+]
+
+[[package]]
 name = "header-chain-link"
 version = "0.0.1"
 dependencies = [
@@ -7085,6 +7102,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp1-cuda"
+version = "6.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc49422996ab1a34e245b1c47131521881be5c853b5c8d49919ce4ba8d4b7192"
+dependencies = [
+ "bincode",
+ "bytes",
+ "reqwest",
+ "serde",
+ "sp1-core-executor",
+ "sp1-core-machine",
+ "sp1-hypercube",
+ "sp1-primitives",
+ "sp1-prover",
+ "sp1-prover-types",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "sp1-curves"
 version = "6.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7460,6 +7498,7 @@ dependencies = [
  "sp1-core-executor",
  "sp1-core-executor-runner",
  "sp1-core-machine",
+ "sp1-cuda",
  "sp1-hypercube",
  "sp1-primitives",
  "sp1-prover",
@@ -9223,6 +9262,7 @@ dependencies = [
  "anyhow",
  "hex",
  "rand 0.8.8",
+ "serde_json",
  "sp1-build",
  "sp1-sdk",
  "tokio",

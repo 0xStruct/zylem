@@ -179,3 +179,62 @@ cd sp1
 cargo run --release -p zylem-hdr-sp1 --bin chain -- ../../../data/testnet               # two links
 cargo run --release -p zylem-hdr-sp1 --bin chain -- ../../../data/testnet --broken-only # rejections
 ```
+
+## Parallel leaves and aggregation in SP1
+
+For the history backfill, segments are proved independently and joined in a tree
+instead of one long sequential chain.
+
+- `sp1/leaf` proves one segment of headers and publishes a 277-byte `RangeClaim`
+  (`core/`): first height, anchor hash and start difficulty context; last height, last
+  hash and end context; total work; a records root; the number of leaves; and whether
+  Equihash was checked.
+- `sp1/agg` verifies two child proofs, joins their claims and publishes one claim for
+  both. It checks that the left range ends exactly where the right one starts (last hash
+  and anchor, next height, end and start difficulty context), adds the work, and sets
+  the records root to SHA-256(0x01 ‖ left root ‖ right root). Which program must have
+  made each child follows from the child's claim (a leaf claim from the leaf program,
+  anything else from the aggregation program itself), not from the host. It re-checks
+  no headers and no Equihash. Children can be leaves or earlier aggregates, so the same
+  program builds a tree of any depth.
+- `accept()` in `sp1/script/src/bin/aggregate.rs` is the client's whole rule: the proof
+  verifies against the trusted aggregation program (which also requires exit code 0),
+  its claim names the trusted leaf and aggregation programs, and its range starts at the
+  trusted checkpoint.
+
+Two leaves of 100 headers (heights 4,494,811 to 4,495,010) and one aggregation, M2 Pro
+CPU, run one after another:
+
+| | Time | Saved proof |
+|---|---|---|
+| Leaf A | 133.9 s | 1,272,846 B |
+| Leaf B | 146.9 s | 1,272,846 B |
+| Aggregation (1,343,319 instructions) | 113.3 s | 1,272,846 B |
+
+The client accepted the aggregate: heights 4,494,811 to 4,495,010, 2 leaves. Peak memory
+was 7.5 GB.
+
+Leaves are independent, so with one prover per leaf the backfill takes the time of one
+leaf plus one aggregation per tree level: about nine levels for the roughly 450 Rings
+since NU5, instead of about 450 links one after another.
+
+Negative tests (`cargo run --release -p zylem-hdr-sp1 --bin aggregate -- --reuse --prove-negatives`):
+
+| Attempt | Rejected by | Result |
+|---|---|---|
+| Leaves not adjacent (A then C) | aggregation program | exit code 1 |
+| Leaves in the wrong order (B then A) | aggregation program | exit code 1 |
+| Right leaf starts from another difficulty context | aggregation program | exit code 1 |
+| Child aggregate made with other programs | aggregation program | exit code 1 |
+| Checkpoint the client does not trust | client | `WrongCheckpoint` |
+| Proof checked against a different program key | client | proof invalid (vk hash mismatch) |
+| A single leaf presented as the history proof | client | proof invalid (vk hash mismatch) |
+| Published claim altered after proving | client | proof invalid (public values) |
+| Client trusts a different leaf program | client | `WrongLeafProgram` |
+| Leaf A's claim altered, with A's real proof | prover | no proof produced |
+| Wrong order, proved anyway | client | SP1 produces a proof with exit code 1; `accept` rejects it ("Unexpected exit code: 1") |
+
+The last row shows why the client must check the exit code: SP1 proves a guest that
+panicked, and only the exit code says so. That a child's claim cannot be altered while
+keeping its real proof rests on SP1's soundness; the test shows the prover cannot
+produce such a proof, not that no adversary could.
