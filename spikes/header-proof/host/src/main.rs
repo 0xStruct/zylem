@@ -113,7 +113,7 @@ fn main() -> Result<()> {
             info.stats.user_cycles, info.stats.total_cycles, info.stats.segments
         );
         println!("  succinct receipt seal: {} bytes; journal {} bytes", info.receipt.seal_size(), info.receipt.journal.bytes.len());
-        println!("  proves heights {}..={}, records hash {}", out.first_height, out.last_height, hex::encode(out.records_hash));
+        println!("  proves heights {}..={}, records commitment {}", out.first_height, out.last_height, hex::encode(out.records.digest()));
     }
     Ok(())
 }

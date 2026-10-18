@@ -286,13 +286,242 @@ pub fn check(
         return Err(Fail::TimeTooLate);
     }
 
+    Ok(Checked { hash, bits, time, work: work(target), record: record_of(header, &hash) })
+}
+
+/// A header's record: what a client keeps of it once the header chain is proven.
+pub fn record_of(header: &[u8], hash: &[u8; 32]) -> [u8; RECORD_SIZE] {
     let mut record = [0u8; RECORD_SIZE];
-    record[..32].copy_from_slice(&hash);
+    record[..32].copy_from_slice(hash);
     record[32..64].copy_from_slice(&header[36..68]); // hashMerkleRoot
     record[64..96].copy_from_slice(&header[68..100]); // hashBlockCommitments
     record[96..100].copy_from_slice(&header[100..104]);
     record[100..104].copy_from_slice(&header[104..108]);
-    Ok(Checked { hash, bits, time, work: work(target), record })
+    record
+}
+
+/// Leaf of the records tree: SHA-256(0x00 ‖ height ‖ record).
+pub fn record_leaf(height: u64, record: &[u8; RECORD_SIZE]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update([0x00]);
+    h.update(height.to_le_bytes());
+    h.update(record);
+    h.finalize().into()
+}
+
+/// Inner node of the records tree: SHA-256(0x01 ‖ left ‖ right).
+pub fn node(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update([0x01]);
+    h.update(left);
+    h.update(right);
+    h.finalize().into()
+}
+
+/// The root of one aligned block of heights: `2^level` records starting at `start`, a
+/// multiple of `2^level`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Peak {
+    pub start: u64,
+    pub level: u8,
+    pub root: [u8; 32],
+}
+
+pub const PEAK_SIZE: usize = 8 + 1 + 32;
+
+impl Peak {
+    fn end(&self) -> u64 {
+        self.start + (1u64 << self.level)
+    }
+}
+
+/// The canonical commitment to the records of a height range.
+///
+/// Every height has a fixed place in one binary tree over all heights, so each aligned
+/// block of `2^k` heights has one root whatever range it is part of. A range's commitment
+/// is the roots of the largest aligned blocks that tile it, lowest height first. It
+/// depends only on the heights and records, never on how provers split the range into
+/// leaves and aggregations, and a client can check any part of it (a Ring, one block)
+/// with sibling hashes up to the peak that contains it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Peaks(pub Vec<Peak>);
+
+/// Why records do not match a commitment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Binding {
+    /// The records are not inside the committed range.
+    OutOfRange,
+    /// A block's path has the wrong length for the peak above it.
+    BadPath,
+    /// The records, their heights or the path do not hash to the committed peak.
+    Mismatch,
+}
+
+/// The largest aligned blocks tiling `first..=last`, as `(start, level)`.
+pub fn canonical_blocks(first: u64, last: u64) -> Vec<(u64, u8)> {
+    let mut out = Vec::new();
+    let mut at = first;
+    while at <= last {
+        let mut level = 0u8;
+        while level < 63 && at % (1u64 << (level + 1)) == 0 && at + (1u64 << (level + 1)) - 1 <= last {
+            level += 1;
+        }
+        out.push((at, level));
+        match at.checked_add(1u64 << level) {
+            Some(next) => at = next,
+            None => break,
+        }
+    }
+    out
+}
+
+impl Peaks {
+    /// Height after the last committed record.
+    pub fn end(&self) -> Option<u64> {
+        self.0.last().map(Peak::end)
+    }
+
+    /// Appends one aligned block that starts where the commitment ends, merging it with
+    /// its left sibling for as long as the pair forms a larger aligned block.
+    pub fn push(&mut self, peak: Peak) {
+        if let Some(end) = self.end() {
+            assert_eq!(peak.start, end, "records are not contiguous");
+        }
+        self.0.push(peak);
+        while let [.., l, r] = self.0[..] {
+            if l.level != r.level || l.start % (1u64 << (l.level + 1)) != 0 {
+                break;
+            }
+            self.0.truncate(self.0.len() - 2);
+            self.0.push(Peak { start: l.start, level: l.level + 1, root: node(&l.root, &r.root) });
+        }
+    }
+
+    pub fn push_record(&mut self, height: u64, record: &[u8; RECORD_SIZE]) {
+        self.push(Peak { start: height, level: 0, root: record_leaf(height, record) });
+    }
+
+    /// The commitment to `left`'s range followed directly by `right`'s.
+    pub fn join(left: &Peaks, right: &Peaks) -> Peaks {
+        let mut out = left.clone();
+        for p in &right.0 {
+            out.push(*p);
+        }
+        out
+    }
+
+    pub fn of_records(first: u64, records: &[[u8; RECORD_SIZE]]) -> Peaks {
+        let mut p = Peaks::default();
+        for (i, r) in records.iter().enumerate() {
+            p.push_record(first + i as u64, r);
+        }
+        p
+    }
+
+    /// Whether the peaks have exactly the canonical shape for `first..=last`.
+    pub fn is_canonical(&self, first: u64, last: u64) -> bool {
+        let shape: Vec<(u64, u8)> = self.0.iter().map(|p| (p.start, p.level)).collect();
+        shape == canonical_blocks(first, last)
+    }
+
+    pub fn encode(&self, out: &mut Vec<u8>) {
+        out.push(self.0.len() as u8);
+        for p in &self.0 {
+            out.extend_from_slice(&p.start.to_le_bytes());
+            out.push(p.level);
+            out.extend_from_slice(&p.root);
+        }
+    }
+
+    /// Decodes peaks from the front of `b`; returns them and the bytes used.
+    pub fn decode(b: &[u8]) -> Option<(Peaks, usize)> {
+        let n = *b.first()? as usize;
+        let used = 1 + n * PEAK_SIZE;
+        if b.len() < used {
+            return None;
+        }
+        let peaks = b[1..used]
+            .chunks(PEAK_SIZE)
+            .map(|c| Peak {
+                start: u64::from_le_bytes(c[..8].try_into().unwrap()),
+                level: c[8],
+                root: c[9..41].try_into().unwrap(),
+            })
+            .collect();
+        Some((Peaks(peaks), used))
+    }
+
+    pub fn digest(&self) -> [u8; 32] {
+        let mut b = Vec::new();
+        self.encode(&mut b);
+        Sha256::digest(b).into()
+    }
+
+    /// Checks that `records` are the committed records at heights `first..`, given one
+    /// sibling path per canonical block of that range (as `range_paths` builds them).
+    pub fn verify_range(&self, first: u64, records: &[[u8; RECORD_SIZE]], paths: &[Vec<[u8; 32]>]) -> Result<(), Binding> {
+        let (Some(start), Some(end)) = (self.0.first().map(|p| p.start), self.end()) else {
+            return Err(Binding::OutOfRange);
+        };
+        if records.is_empty() {
+            return Err(Binding::OutOfRange);
+        }
+        let last = first + records.len() as u64 - 1;
+        if first < start || last >= end {
+            return Err(Binding::OutOfRange);
+        }
+        let blocks = canonical_blocks(first, last);
+        if paths.len() != blocks.len() {
+            return Err(Binding::BadPath);
+        }
+        for ((bstart, level), path) in blocks.into_iter().zip(paths) {
+            let peak = self.0.iter().find(|p| p.start <= bstart && bstart < p.end()).ok_or(Binding::OutOfRange)?;
+            if path.len() != (peak.level - level) as usize {
+                return Err(Binding::BadPath);
+            }
+            let from = (bstart - first) as usize;
+            let mut root = Peaks::of_records(bstart, &records[from..from + (1usize << level)]).0[0].root;
+            for (i, sibling) in path.iter().enumerate() {
+                let l = level as u32 + i as u32;
+                root = if (bstart >> l) & 1 == 0 { node(&root, sibling) } else { node(sibling, &root) };
+            }
+            if root != peak.root {
+                return Err(Binding::Mismatch);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The root of the aligned block `(start, level)` from the leaves of the whole committed
+/// range (`leaves[i]` at height `first + i`).
+fn block_root(first: u64, leaves: &[[u8; 32]], start: u64, level: u8) -> [u8; 32] {
+    let from = (start - first) as usize;
+    let mut layer: Vec<[u8; 32]> = leaves[from..from + (1usize << level)].to_vec();
+    while layer.len() > 1 {
+        layer = layer.chunks(2).map(|c| node(&c[0], &c[1])).collect();
+    }
+    layer[0]
+}
+
+/// What a server holding every record of a committed range sends with a sub-range
+/// `sub_first..=sub_last`: for each canonical block of the sub-range, the sibling roots
+/// up to the peak containing it.
+pub fn range_paths(first: u64, records: &[[u8; RECORD_SIZE]], sub_first: u64, sub_last: u64) -> Vec<Vec<[u8; 32]>> {
+    let leaves: Vec<[u8; 32]> = records.iter().enumerate().map(|(i, r)| record_leaf(first + i as u64, r)).collect();
+    let peaks = canonical_blocks(first, first + records.len() as u64 - 1);
+    canonical_blocks(sub_first, sub_last)
+        .into_iter()
+        .map(|(start, level)| {
+            let (_, top) = *peaks.iter().find(|(s, l)| *s <= start && start < s + (1u64 << l)).expect("inside the range");
+            (level..top)
+                .map(|l| {
+                    let sibling = ((start >> l) ^ 1) << l;
+                    block_root(first, &leaves, sibling, l)
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// The guest's input: predecessors for context, then the headers to prove.
@@ -321,8 +550,8 @@ pub struct Output {
     pub last_hash: [u8; 32],
     /// Work of the proven headers, big-endian.
     pub work: [u8; 32],
-    /// SHA-256 over every proven header's record, in order.
-    pub records_hash: [u8; 32],
+    /// Canonical commitment to every proven header's record at its height.
+    pub records: Peaks,
     /// SHA-256 of the context the next proof must start from.
     pub end_context_hash: [u8; 32],
     pub equihash_checked: bool,
@@ -342,7 +571,7 @@ pub fn run(input: &Input, headers: &[u8]) -> Result<Output, (u64, Fail)> {
     let mut ctx: Vec<(u32, u32)> = input.context.clone();
     let mut prev_hash = input.anchor_hash;
     let mut total = U256::zero();
-    let mut records = Sha256::new();
+    let mut records = Peaks::default();
     let mut height = input.first_height;
     let mut newest_first: Vec<(u32, u32)> = Vec::with_capacity(MAX_CONTEXT);
     for header in headers.chunks(HEADER_SIZE).take(input.count as usize) {
@@ -350,7 +579,7 @@ pub fn run(input: &Input, headers: &[u8]) -> Result<Output, (u64, Fail)> {
         newest_first.extend(ctx.iter().rev().take(MAX_CONTEXT).copied());
         let c = check(input.net, height, header, &prev_hash, &newest_first, input.check_equihash)
             .map_err(|f| (height, f))?;
-        records.update(c.record);
+        records.push_record(height, &c.record);
         total += c.work;
         prev_hash = c.hash;
         ctx.push((c.bits, c.time));
@@ -369,7 +598,7 @@ pub fn run(input: &Input, headers: &[u8]) -> Result<Output, (u64, Fail)> {
         last_height: height - 1,
         last_hash: prev_hash,
         work,
-        records_hash: records.finalize().into(),
+        records,
         end_context_hash: context_hash(&ctx),
         equihash_checked: input.check_equihash,
     })
@@ -394,6 +623,129 @@ mod tests {
         let wide = U512::from(x) * U512::from(97u64);
         assert_eq!(div_small_512(wide, 97), x);
     }
+
+    fn records(n: usize, seed: u8) -> Vec<[u8; RECORD_SIZE]> {
+        (0..n)
+            .map(|i| {
+                let mut r = [0u8; RECORD_SIZE];
+                for (j, c) in r.chunks_mut(32).enumerate() {
+                    let d: [u8; 32] = Sha256::digest([seed, (i >> 8) as u8, i as u8, j as u8]).into();
+                    c.copy_from_slice(&d[..c.len()]);
+                }
+                r
+            })
+            .collect()
+    }
+
+    /// A leaf claim over `records` at `first`, chained by fake hashes so claims join.
+    fn claim(first: u64, records: &[[u8; RECORD_SIZE]]) -> RangeClaim {
+        let last = first + records.len() as u64 - 1;
+        let tag = |h: u64| -> [u8; 32] { Sha256::digest(h.to_le_bytes()).into() };
+        RangeClaim {
+            leaf_vk: [0; 8],
+            agg_vk: [0; 8],
+            first_height: first,
+            anchor_hash: tag(first - 1),
+            start_context_hash: tag(first + 1_000_000),
+            last_height: last,
+            last_hash: tag(last),
+            end_context_hash: tag(last + 1 + 1_000_000),
+            work: [0; 32],
+            leaves: 1,
+            equihash_checked: true,
+            records: Peaks::of_records(first, records),
+        }
+    }
+
+    const FIRST: u64 = 4_494_811;
+
+    #[test]
+    fn records_commitment_does_not_depend_on_the_split() {
+        let r = records(300, 1);
+        let whole = Peaks::of_records(FIRST, &r);
+        assert!(whole.is_canonical(FIRST, FIRST + 299));
+        for k in [1, 37, 100, 128, 150, 299] {
+            let joined = Peaks::join(&Peaks::of_records(FIRST, &r[..k]), &Peaks::of_records(FIRST + k as u64, &r[k..]));
+            assert_eq!(joined, whole, "split at {k}");
+        }
+        // Three leaves, joined left-first and right-first, through the claim rule.
+        let (a, b, c) = (claim(FIRST, &r[..90]), claim(FIRST + 90, &r[90..200]), claim(FIRST + 200, &r[200..]));
+        let left_first = RangeClaim::join(&RangeClaim::join(&a, &b, [1; 8], [2; 8]).unwrap(), &c, [1; 8], [2; 8]).unwrap();
+        let right_first = RangeClaim::join(&a, &RangeClaim::join(&b, &c, [1; 8], [2; 8]).unwrap(), [1; 8], [2; 8]).unwrap();
+        assert_eq!(left_first.records, whole);
+        assert_eq!(right_first.records, whole);
+    }
+
+    #[test]
+    fn records_commitment_commits_to_heights_and_order() {
+        // 1,024 records at two aligned heights have the same shape: one level-10 peak.
+        let r = records(1_024, 2);
+        let (at0, at1024) = (Peaks::of_records(4_096, &r), Peaks::of_records(5_120, &r));
+        assert_eq!((at0.0.len(), at0.0[0].level, at1024.0[0].level), (1, 10, 10));
+        assert_ne!(at0.0[0].root, at1024.0[0].root, "same records at other heights must differ");
+
+        let mut swapped = r.clone();
+        swapped.swap(3, 4);
+        assert_ne!(Peaks::of_records(4_096, &swapped), at0);
+    }
+
+    #[test]
+    fn a_ring_binds_to_the_proven_records() {
+        let r = records(300, 3);
+        let peaks = Peaks::of_records(FIRST, &r);
+        // A "Ring" in the middle of the proven range, not aligned to any block.
+        let (lo, hi) = (FIRST + 41, FIRST + 233);
+        let ring = &r[41..=233];
+        let paths = range_paths(FIRST, &r, lo, hi);
+        assert_eq!(peaks.verify_range(lo, ring, &paths), Ok(()));
+        // A single block.
+        assert_eq!(peaks.verify_range(FIRST + 7, &r[7..8], &range_paths(FIRST, &r, FIRST + 7, FIRST + 7)), Ok(()));
+
+        // One altered byte in one record.
+        let mut tampered = ring.to_vec();
+        tampered[100][40] ^= 1;
+        assert_eq!(peaks.verify_range(lo, &tampered, &paths), Err(Binding::Mismatch));
+        // Two records swapped.
+        let mut swapped = ring.to_vec();
+        swapped.swap(10, 11);
+        assert_eq!(peaks.verify_range(lo, &swapped, &paths), Err(Binding::Mismatch));
+        // The right records presented at the wrong heights, with paths for those heights.
+        let shifted = range_paths(FIRST, &r, lo + 1, hi + 1);
+        assert_ne!(peaks.verify_range(lo + 1, ring, &shifted), Ok(()));
+        // Outside the proven range.
+        assert_eq!(peaks.verify_range(FIRST - 1, &r[..2], &paths), Err(Binding::OutOfRange));
+        assert_eq!(peaks.verify_range(FIRST + 299, &r[..2], &paths), Err(Binding::OutOfRange));
+        // A forged sibling, and a path that stops short of the peak.
+        let mut forged = paths.clone();
+        forged[0][0][0] ^= 1;
+        assert_eq!(peaks.verify_range(lo, ring, &forged), Err(Binding::Mismatch));
+        let mut short = paths.clone();
+        short[0].pop();
+        assert_eq!(peaks.verify_range(lo, ring, &short), Err(Binding::BadPath));
+    }
+
+    #[test]
+    fn claims_round_trip_and_reject_bad_commitments() {
+        let r = records(300, 4);
+        let (a, b) = (claim(FIRST, &r[..150]), claim(FIRST + 150, &r[150..]));
+        let joined = RangeClaim::join(&a, &b, [1; 8], [2; 8]).unwrap();
+        let bytes = joined.encode();
+        assert_eq!(RangeClaim::decode(&bytes), Some(joined));
+        let mut longer = bytes.clone();
+        longer.push(0);
+        assert_eq!(RangeClaim::decode(&longer), None);
+        assert_eq!(RangeClaim::decode(&bytes[..bytes.len() - 1]), None);
+
+        // A child whose peaks were never merged (two level-0 blocks that form a level-1 one).
+        let mut unmerged = claim(FIRST + 150, &r[150..]);
+        unmerged.records = Peaks(
+            canonical_blocks(FIRST + 150, FIRST + 299)
+                .into_iter()
+                .flat_map(|(s, l)| (0..1u64 << l).map(move |i| Peak { start: s + i, level: 0, root: [0; 32] }))
+                .collect(),
+        );
+        assert_eq!(RangeClaim::join(&a, &unmerged, [1; 8], [2; 8]), Err(Join::BadRecords));
+    }
 }
 
 /// The running state a chain of segment proofs publishes. Each link verifies the previous
@@ -413,7 +765,7 @@ pub struct ChainState {
     /// Total work of every proven header, big-endian.
     pub work: [u8; 32],
     pub end_context_hash: [u8; 32],
-    /// SHA-256 chain over each segment's records hash.
+    /// SHA-256 chain over the digest of each segment's records commitment.
     pub records_acc: [u8; 32],
     pub segments: u32,
     /// True only if every segment checked Equihash.
@@ -485,7 +837,7 @@ impl ChainState {
         (work + U256::from_big_endian(&out.work)).to_big_endian(&mut total);
         let mut h = Sha256::new();
         h.update(acc);
-        h.update(out.records_hash);
+        h.update(out.records.digest());
         ChainState {
             vk,
             checkpoint_height,
@@ -536,13 +888,15 @@ pub struct RangeClaim {
     pub end_context_hash: [u8; 32],
     /// Total work, big-endian.
     pub work: [u8; 32],
-    /// A leaf's records hash, or SHA-256(0x01 || left root || right root).
-    pub records_root: [u8; 32],
     pub leaves: u32,
     pub equihash_checked: bool,
+    /// Canonical commitment to the range's records; the same whichever leaves and
+    /// aggregations produced it.
+    pub records: Peaks,
 }
 
-pub const RANGE_CLAIM_SIZE: usize = 32 + 32 + 8 + 32 + 32 + 8 + 32 + 32 + 32 + 32 + 4 + 1;
+/// Size of a claim before its records commitment (one count byte plus 41 bytes a peak).
+pub const RANGE_CLAIM_FIXED: usize = 32 + 32 + 8 + 32 + 32 + 8 + 32 + 32 + 32 + 4 + 1;
 
 /// Why two claims cannot be combined.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -551,6 +905,8 @@ pub enum Join {
     HeightGap,
     ContextMismatch,
     MixedPrograms,
+    /// A child's records commitment does not have the shape of its height range.
+    BadRecords,
 }
 
 fn vk_bytes(vk: &[u32; 8], out: &mut Vec<u8>) {
@@ -580,9 +936,9 @@ impl RangeClaim {
             last_hash: out.last_hash,
             end_context_hash: out.end_context_hash,
             work: out.work,
-            records_root: out.records_hash,
             leaves: 1,
             equihash_checked: out.equihash_checked,
+            records: out.records.clone(),
         }
     }
 
@@ -606,12 +962,13 @@ impl RangeClaim {
                 return Err(Join::MixedPrograms);
             }
         }
+        for c in [left, right] {
+            if !c.records.is_canonical(c.first_height, c.last_height) {
+                return Err(Join::BadRecords);
+            }
+        }
         let mut work = [0u8; 32];
         (U256::from_big_endian(&left.work) + U256::from_big_endian(&right.work)).to_big_endian(&mut work);
-        let mut h = Sha256::new();
-        h.update([0x01]);
-        h.update(left.records_root);
-        h.update(right.records_root);
         Ok(RangeClaim {
             leaf_vk,
             agg_vk,
@@ -622,14 +979,14 @@ impl RangeClaim {
             last_hash: right.last_hash,
             end_context_hash: right.end_context_hash,
             work,
-            records_root: h.finalize().into(),
             leaves: left.leaves + right.leaves,
             equihash_checked: left.equihash_checked && right.equihash_checked,
+            records: Peaks::join(&left.records, &right.records),
         })
     }
 
     pub fn encode(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(RANGE_CLAIM_SIZE);
+        let mut out = Vec::with_capacity(RANGE_CLAIM_FIXED + 1 + self.records.0.len() * PEAK_SIZE);
         vk_bytes(&self.leaf_vk, &mut out);
         vk_bytes(&self.agg_vk, &mut out);
         out.extend_from_slice(&self.first_height.to_le_bytes());
@@ -639,14 +996,18 @@ impl RangeClaim {
         out.extend_from_slice(&self.last_hash);
         out.extend_from_slice(&self.end_context_hash);
         out.extend_from_slice(&self.work);
-        out.extend_from_slice(&self.records_root);
         out.extend_from_slice(&self.leaves.to_le_bytes());
         out.push(self.equihash_checked as u8);
+        self.records.encode(&mut out);
         out
     }
 
     pub fn decode(b: &[u8]) -> Option<Self> {
-        if b.len() != RANGE_CLAIM_SIZE {
+        if b.len() <= RANGE_CLAIM_FIXED {
+            return None;
+        }
+        let (records, used) = Peaks::decode(&b[RANGE_CLAIM_FIXED..])?;
+        if RANGE_CLAIM_FIXED + used != b.len() {
             return None;
         }
         let a32 = |at: usize| -> [u8; 32] { b[at..at + 32].try_into().unwrap() };
@@ -661,9 +1022,9 @@ impl RangeClaim {
             last_hash: a32(144),
             end_context_hash: a32(176),
             work: a32(208),
-            records_root: a32(240),
-            leaves: u32::from_le_bytes(b[272..276].try_into().unwrap()),
-            equihash_checked: b[276] == 1,
+            leaves: u32::from_le_bytes(b[240..244].try_into().unwrap()),
+            equihash_checked: b[244] == 1,
+            records,
         })
     }
 }

@@ -20,8 +20,9 @@ For each header (`core/src/lib.rs`, shared by the guest and the native validator
 
 Each header yields a 104-byte record (hash, Merkle root, block commitments, time,
 bits). The proof publishes the start anchor and context, the end hash and context, the
-total work, and a SHA-256 over the records, so proofs chain and a client can check a
-Ring's records against them instead of downloading headers.
+total work, and a commitment to the records at their heights, so proofs chain and a
+client can check a Ring's records against them instead of downloading headers (see
+"Binding proofs to Rings").
 
 ## Results
 
@@ -185,40 +186,50 @@ cargo run --release -p zylem-hdr-sp1 --bin chain -- ../../../data/testnet --brok
 For the history backfill, segments are proved independently and joined in a tree
 instead of one long sequential chain.
 
-- `sp1/leaf` proves one segment of headers and publishes a 277-byte `RangeClaim`
-  (`core/`): first height, anchor hash and start difficulty context; last height, last
-  hash and end context; total work; a records root; the number of leaves; and whether
-  Equihash was checked.
+- `sp1/leaf` proves one segment of headers and publishes a `RangeClaim` (`core/`, 245
+  bytes plus 41 per records peak): first height, anchor hash and start difficulty
+  context; last height, last hash and end context; total work; the number of leaves;
+  whether Equihash was checked; and the records commitment.
 - `sp1/agg` verifies two child proofs, joins their claims and publishes one claim for
   both. It checks that the left range ends exactly where the right one starts (last hash
-  and anchor, next height, end and start difficulty context), adds the work, and sets
-  the records root to SHA-256(0x01 ‖ left root ‖ right root). Which program must have
+  and anchor, next height, end and start difficulty context) and that each child's
+  records commitment has the canonical shape for its range, adds the work, and joins
+  the two records commitments. Which program must have
   made each child follows from the child's claim (a leaf claim from the leaf program,
   anything else from the aggregation program itself), not from the host. It re-checks
   no headers and no Equihash. Children can be leaves or earlier aggregates, so the same
   program builds a tree of any depth.
 - `accept()` in `sp1/script/src/bin/aggregate.rs` is the client's whole rule: the proof
   verifies against the trusted aggregation program (which also requires exit code 0),
-  its claim names the trusted leaf and aggregation programs, and its range starts at the
-  trusted checkpoint.
+  its records commitment has the canonical shape for its range, its claim names the
+  trusted leaf and aggregation programs, its range starts at the trusted checkpoint, and
+  every header in it had its Equihash solution checked. Equihash is required, not a
+  policy option: without it a forged header only needs a double-SHA-256 below its
+  target, which SHA-256 mining hardware makes far cheaper than real Zcash work.
 
 Two leaves of 100 headers (heights 4,494,811 to 4,495,010) and one aggregation, M2 Pro
-CPU, run one after another:
+CPU, run one after another, rerun on 2026-10-22 with the records commitment below:
 
 | | Time | Saved proof |
 |---|---|---|
-| Leaf A | 133.9 s | 1,272,846 B |
-| Leaf B | 146.9 s | 1,272,846 B |
-| Aggregation (1,343,319 instructions) | 113.3 s | 1,272,846 B |
+| Leaf A | 172.1 s | 1,273,184 B |
+| Leaf B | 162.3 s | 1,273,020 B |
+| Aggregation (1,365,932 instructions) | 130.4 s | 1,273,102 B |
 
-The client accepted the aggregate: heights 4,494,811 to 4,495,010, 2 leaves. Peak memory
-was 7.5 GB.
+(The first run, with the old records hash, took 133.9 s, 146.9 s and 113.3 s; the extra
+time is mostly run-to-run variation on a busy laptop, the instruction count rose 1.7%.)
+These leaves skip Equihash, because proving it needs about 27 GB of memory on a CPU, so
+the client rejects the aggregate with `EquihashNotChecked` after every other check
+passes. `SP1_PROVER=mock aggregate --equihash` runs the same flow with Equihash through
+execution and the client accepts it; the RTX 5090 run below proves Equihash leaves for
+real. Peak resident memory was 6.8 GB.
 
 Leaves are independent, so with one prover per leaf the backfill takes the time of one
 leaf plus one aggregation per tree level: about nine levels for the roughly 450 Rings
 since NU5, instead of about 450 links one after another.
 
-Negative tests (`cargo run --release -p zylem-hdr-sp1 --bin aggregate -- --reuse --prove-negatives`):
+Negative tests (`cargo run --release -p zylem-hdr-sp1 --bin aggregate -- --reuse --prove-negatives`;
+`--equihash` with `SP1_PROVER=mock` adds the mixed-leaf case):
 
 | Attempt | Rejected by | Result |
 |---|---|---|
@@ -226,10 +237,15 @@ Negative tests (`cargo run --release -p zylem-hdr-sp1 --bin aggregate -- --reuse
 | Leaves in the wrong order (B then A) | aggregation program | exit code 1 |
 | Right leaf starts from another difficulty context | aggregation program | exit code 1 |
 | Child aggregate made with other programs | aggregation program | exit code 1 |
+| Right leaf's records committed one height off | aggregation program | exit code 1 (`BadRecords`) |
+| Right leaf's records not merged into the canonical blocks | aggregation program | exit code 1 (`BadRecords`) |
 | Checkpoint the client does not trust | client | `WrongCheckpoint` |
 | Proof checked against a different program key | client | proof invalid (vk hash mismatch) |
 | A single leaf presented as the history proof | client | proof invalid (vk hash mismatch) |
-| Published claim altered after proving | client | proof invalid (public values) |
+| Published claim altered after proving (work) | client | proof invalid (public values) |
+| Published records commitment altered after proving | client | proof invalid (public values) |
+| Leaves proved without Equihash | client | `EquihashNotChecked` |
+| One Equihash leaf joined with one without (mock prover) | client | `EquihashNotChecked` |
 | Client trusts a different leaf program | client | `WrongLeafProgram` |
 | Leaf A's claim altered, with A's real proof | prover | no proof produced |
 | Wrong order, proved anyway | client | SP1 produces a proof with exit code 1; `accept` rejects it ("Unexpected exit code: 1") |
@@ -238,6 +254,56 @@ The last row shows why the client must check the exit code: SP1 proves a guest t
 panicked, and only the exit code says so. That a child's claim cannot be altered while
 keeping its real proof rests on SP1's soundness; the test shows the prover cannot
 produce such a proof, not that no adversary could.
+
+## Binding proofs to Rings
+
+A proof is only useful to a wallet if the records in the Ring it downloaded are the
+records the proof covers, at the heights it covers them. The first aggregation hashed
+each leaf's records in order and joined leaves as SHA-256(0x01 ‖ left ‖ right), so the
+root depended on where provers split the range, and a record carried no height. A
+client could not recompute it from a Ring.
+
+The records commitment (`Peaks` in `core/`) is now fixed by the heights alone:
+
+- every height has one place in a binary tree over all heights; a record's leaf is
+  SHA-256(0x00 ‖ height ‖ record) and an inner node SHA-256(0x01 ‖ left ‖ right);
+- a range's commitment is the roots of the largest aligned blocks of 2^k heights that
+  tile it, lowest first: at most about two per bit of the range's length (17 for the
+  1.84 million heights since NU5, never more than 42 for a range that size, so a claim
+  stays under 2 KB; a testnet Ring is 12 blocks);
+- a leaf builds it record by record, merging a block with its left sibling as soon as
+  the pair forms an aligned block; an aggregation appends the right child's blocks to
+  the left child's the same way. The result is the same however the range was split;
+- a Ring, or one block, is checked with the sibling hashes from each of its own aligned
+  blocks up to the committed block containing it (`range_paths` and
+  `Peaks::verify_range`).
+
+The aggregation program and `accept()` also check that a commitment has exactly the
+canonical block layout for its range, so a commitment cannot claim other heights.
+
+Cost: 32,135 instructions per header without Equihash in SP1, up from 29,592 (+8.6%,
+the per-record hashing); with Equihash the difference is lost in its 3.96 million.
+
+Checks in `aggregate` against the real headers of the two leaves (heights 4,494,811 to
+4,495,010; the commitment has 7 blocks):
+
+| Check | Result |
+|---|---|
+| Records recomputed from the Ring headers equal the proven commitment | equal |
+| The same 200 headers as leaves of 33, 117 and 50, joined right-first (executed) | same commitment |
+| Headers 4,494,836 to 4,494,961, across the leaf boundary, with 17 sibling hashes | verified |
+| One block (4,494,839) | verified |
+| Two neighbouring headers swapped | `Mismatch` |
+| Every header one height off | `Mismatch` |
+| Headers after the proven range | `OutOfRange` |
+
+Native unit tests (`cargo test -p zylem-hdr`) cover splits at six points and a
+three-leaf tree joined both ways, equal records at two heights giving different roots, a
+tampered record, swapped records, shifted heights, ranges outside the claim, a forged
+sibling, a short path, claim encoding, and a child whose blocks were never merged.
+
+Sibling paths are not yet deduplicated (blocks inside the same committed block repeat
+some upper siblings); serving them next to Rings is the next step.
 
 ## GPU proving in SP1
 
