@@ -1,0 +1,54 @@
+gpu-bench: backend cuda, GPU NVIDIA GeForce RTX 5090, price $1.19/h, 8192 headers loaded
+Running sp1-gpu-server 6.9.0 with device 0
+warm-up (10 headers, not counted): 1.7 s
+
+ headers Equihash    prove s   instructions     prover gas        MHz   VRAM MiB     s/header
+     100      off        3.1        2993049        4188967       0.96      18316       0.0311
+    1024      off       10.3       30318283       42336895       2.93      26126       0.0101
+    4096      off       28.4      121209152      169200891       4.27      26160       0.0069
+     100       on       57.6      397573947      351614158       6.90      26416       0.5764
+     256       on      149.6     1017723736      900024800       6.80      26418       0.5843
+     512       on      272.1     2035403253     1799960742       7.48      26418       0.5314
+
+aggregation of two 100-header leaves: 2.2 s, 2 leaves joined
+
+projection from the 512-header Equihash leaf:
+  0.5314 s and $0.000176 per header at $1.19/h
+  backfill since NU5 (1838000 headers + 449 aggregations): 272 GPU-hours = $323
+  same work on the Succinct network at $0.12/billion prover gas: $775
+
+results appended to ../gpu-bench/results/NVIDIA-GeForce-RTX-5090-20261021T171749Z.jsonl
+
+thread 'main' (27601) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sp1-cuda-6.9.0/src/pk.rs:63:9:
+there is no reactor running, must be called from the context of a Tokio 1.x runtime
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (27601) panicked at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sp1-cuda-6.9.0/src/pk.rs:63:9:
+there is no reactor running, must be called from the context of a Tokio 1.x runtime
+stack backtrace:
+   0:     0x5fbb840ac6d8 - <<std[1e3c4ec04c5261a9]::sys::backtrace::BacktraceLock>::print::DisplayBacktrace as core[37f591cfbe66b0b1]::fmt::Display>::fmt
+   1:     0x5fbb840c84da - core[37f591cfbe66b0b1]::fmt::write
+   2:     0x5fbb840b51a2 - <std[1e3c4ec04c5261a9]::sys::stdio::unix::Stderr as std[1e3c4ec04c5261a9]::io::Write>::write_fmt
+   3:     0x5fbb84087ab6 - std[1e3c4ec04c5261a9]::panicking::default_hook::{closure#0}
+   4:     0x5fbb840a32d1 - std[1e3c4ec04c5261a9]::panicking::default_hook
+   5:     0x5fbb840a354b - std[1e3c4ec04c5261a9]::panicking::panic_with_hook
+   6:     0x5fbb84087b72 - std[1e3c4ec04c5261a9]::panicking::panic_handler::{closure#0}
+   7:     0x5fbb8407c3f9 - std[1e3c4ec04c5261a9]::sys::backtrace::__rust_end_short_backtrace::<std[1e3c4ec04c5261a9]::panicking::panic_handler::{closure#0}, !>
+   8:     0x5fbb84088c7d - __rustc[6ef78fba13ac776c]::rust_begin_unwind
+   9:     0x5fbb840c8bfc - core[37f591cfbe66b0b1]::panicking::panic_fmt
+  10:     0x5fbb830888c3 - tokio[3bd940e9e0ee18a9]::task::spawn::spawn::<<sp1_cuda[13fec7a9c966fc9e]::pk::SessionKey as core[37f591cfbe66b0b1]::ops::drop::Drop>::drop::{closure#0}>
+  11:     0x5fbb8307a9ed - <sp1_cuda[13fec7a9c966fc9e]::pk::SessionKey as core[37f591cfbe66b0b1]::ops::drop::Drop>::drop
+  12:     0x5fbb82e241b5 - <alloc[24b8200b0946867]::sync::Arc<sp1_cuda[13fec7a9c966fc9e]::pk::SessionKey>>::drop_slow
+  13:     0x5fbb82071c8d - gpu_bench[9b9262c277619a2b]::main
+  14:     0x5fbb82099013 - std[1e3c4ec04c5261a9]::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core[37f591cfbe66b0b1]::result::Result<(), anyhow[277d66a25019649e]::Error>, core[37f591cfbe66b0b1]::result::Result<(), anyhow[277d66a25019649e]::Error>>
+  15:     0x5fbb820997dd - std[1e3c4ec04c5261a9]::rt::lang_start::<core[37f591cfbe66b0b1]::result::Result<(), anyhow[277d66a25019649e]::Error>>::{closure#0}
+  16:     0x5fbb840a20f7 - std[1e3c4ec04c5261a9]::rt::lang_start_internal
+  17:     0x5fbb820736d5 - main
+  18:     0x70d5af3451ca - <unknown>
+  19:     0x70d5af34528b - __libc_start_main
+  20:     0x5fbb820686a5 - _start
+  21:                0x0 - <unknown>
+
+thread 'main' (27601) panicked at /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library/core/src/panicking.rs:233:5:
+panic in a destructor during cleanup
+thread caused non-unwinding panic. aborting.

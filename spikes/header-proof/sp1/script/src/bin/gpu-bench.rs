@@ -111,6 +111,40 @@ impl VramSampler {
     }
 }
 
+/// Holds an SP1 client or proving key and drops it inside a tokio runtime. sp1-cuda's
+/// destructors release the key and stop its GPU server with `tokio::spawn`, which panics
+/// outside a runtime, and the blocking SDK keeps its own runtime private. Without this the
+/// process aborts on exit and leaves `sp1-gpu-server` running.
+struct InRuntime<T>(Option<T>);
+
+impl<T> InRuntime<T> {
+    fn new(value: T) -> Self {
+        InRuntime(Some(value))
+    }
+}
+
+impl<T> std::ops::Deref for InRuntime<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl<T> Drop for InRuntime<T> {
+    fn drop(&mut self) {
+        match tokio::runtime::Runtime::new() {
+            Ok(rt) => {
+                let _guard = rt.enter();
+                drop(self.0.take());
+            }
+            Err(e) => {
+                eprintln!("no tokio runtime for cleanup ({e}); leaking the SP1 handle");
+                std::mem::forget(self.0.take());
+            }
+        }
+    }
+}
+
 fn segment(all: &[(u64, Vec<u8>)], start: usize, count: usize, check_equihash: bool) -> Result<(Input, Vec<u8>)> {
     if start + count > all.len() {
         bail!("not enough headers in the Ring bundle for {count} headers");
@@ -159,6 +193,12 @@ fn proof_size(p: &SP1ProofWithPublicValues) -> Result<u64> {
 }
 
 fn main() -> Result<()> {
+    // `--check`: the binary loads and runs on this machine (used by setup.sh to decide
+    // whether a prebuilt binary can be reused).
+    if std::env::args().any(|a| a == "--check") {
+        println!("gpu-bench ok (cuda feature: {})", cfg!(feature = "cuda"));
+        return Ok(());
+    }
     let args = parse()?;
     let all = zylem_hdr_validate::load_headers(&args.dir)?;
     let start = MAX_CONTEXT + 1_000;
@@ -166,9 +206,9 @@ fn main() -> Result<()> {
     let backend = std::env::var("SP1_PROVER").unwrap_or_else(|_| "cpu".into());
     println!("gpu-bench: backend {backend}, GPU {}, price ${}/h, {} headers loaded", args.gpu, args.price, all.len());
 
-    let client = ProverClient::from_env();
-    let leaf_pk = client.setup(LEAF_ELF)?;
-    let agg_pk = client.setup(AGG_ELF)?;
+    let client = InRuntime::new(ProverClient::from_env());
+    let leaf_pk = InRuntime::new(client.setup(LEAF_ELF)?);
+    let agg_pk = InRuntime::new(client.setup(AGG_ELF)?);
     let leaf_vk = leaf_pk.verifying_key().clone();
     let agg_vk = agg_pk.verifying_key().clone();
 

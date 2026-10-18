@@ -31,13 +31,20 @@ downloads SP1's GPU server (141 MB) and loads its kernels.
    - `runpodctl send data/gpu-bench/zylem-gpu-bench.tar.gz` here, then
      `runpodctl receive <code>` on the pod;
    - or `scp` to the pod's SSH address.
-4. **Set up and build** on the pod (10–20 minutes, mostly compiling):
+4. **Set up** on the pod:
    ```bash
    tar xzf zylem-gpu-bench.tar.gz
    zylem/spikes/header-proof/gpu-bench/setup.sh
    ```
-   It installs build tools, Rust (the version the repo pins), Google's `protoc` and
-   SP1's toolchain (`sp1up`), then builds `gpu-bench` with CUDA.
+   - **First run** (no prebuilt binary in the bundle): installs build tools, Rust (the
+     version the repo pins), Google's `protoc` and SP1's toolchain (`sp1up`), builds
+     `gpu-bench` with CUDA (10–20 minutes, mostly compiling), and saves the result as
+     `zylem/spikes/header-proof/gpu-bench/gpu-bench-prebuilt-linux-x86_64.tar.gz`.
+   - **Later runs** (the bundle contains that binary): checks the binary starts on this
+     machine and skips everything else, about a minute. If it doesn't start (an older
+     system library on a different image), it builds from source as on a first run.
+     `BUILD-INFO.txt` beside the binary says what it was built on; use the same image or
+     a newer one. `FORCE_BUILD=1` always builds.
 5. **Run**, passing the pod's hourly price in USD:
    ```bash
    zylem/spikes/header-proof/gpu-bench/run.sh 0.99
@@ -45,9 +52,14 @@ downloads SP1's GPU server (141 MB) and loads its kernels.
    zylem/spikes/header-proof/gpu-bench/run.sh 0.99 --sizes-on 100,256,512,1024
    ```
    Results go to `zylem/spikes/header-proof/gpu-bench/results/<GPU>-<time>.jsonl` and
-   `.log`.
-6. **Copy the results back** (`runpodctl send …/results` or `scp`), then **stop and
-   delete the pod**: it bills while it exists.
+   `.log`. SP1 downloads its GPU server (141 MB) from GitHub on the first proof of each
+   pod.
+6. **Copy back** before deleting the pod:
+   - `zylem/spikes/header-proof/gpu-bench/results/` into
+     `spikes/header-proof/gpu-bench/results/` here;
+   - after a first run, `gpu-bench-prebuilt-linux-x86_64.tar.gz` into `data/gpu-bench/`
+     here (about 20 MB). The next `pack.sh` includes it, so the next pod skips the build.
+7. **Delete the pod** (not just stop it): a stopped pod still bills for its disk.
 
 ## Reading the result
 

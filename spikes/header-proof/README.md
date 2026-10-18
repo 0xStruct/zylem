@@ -238,3 +238,43 @@ The last row shows why the client must check the exit code: SP1 proves a guest t
 panicked, and only the exit code says so. That a child's claim cannot be altered while
 keeping its real proof rests on SP1's soundness; the test shows the prover cannot
 produce such a proof, not that no adversary could.
+
+## GPU proving in SP1
+
+`gpu-bench/` run on one RTX 5090 (32 GB, RunPod Secure Cloud on-demand, $1.19/h,
+`runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`, driver 595.91.07), SP1 6.9.0 with
+`SP1_PROVER=cuda`, compressed proofs of real testnet headers from the first two Rings,
+2026-10-21:
+
+| Headers | Equihash | Proving time | s/header | Instructions | MHz | Peak GPU memory |
+|---|---|---|---|---|---|---|
+| 100 | off | 3.1 s | 0.0311 | 2,993,049 | 0.96 | 18,316 MiB |
+| 1,024 | off | 10.3 s | 0.0101 | 30,318,283 | 2.93 | 26,126 MiB |
+| 4,096 | off | 28.4 s | 0.0069 | 121,209,152 | 4.27 | 26,160 MiB |
+| 100 | on | 57.6 s | 0.576 | 397,573,947 | 6.90 | 26,416 MiB |
+| 256 | on | 149.6 s | 0.584 | 1,017,723,736 | 6.80 | 26,418 MiB |
+| 512 | on | 272.1 s | 0.531 | 2,035,403,253 | 7.48 | 26,418 MiB |
+| Aggregation of two 100-header leaves | | 2.2 s | | | | 26,418 MiB |
+
+Every proof is 1,272,846 B saved, as on the CPU. Against the M2 Pro: 100 headers
+without Equihash take 3.1 s instead of 146 s, and an aggregation 2.2 s instead of
+113.3 s. Throughput grows with leaf size (fixed per-proof overhead), so a full 4,096-
+header Ring with Equihash should land at or below the 512-header figure; it was not
+measured.
+
+**Backfill since NU5** (1,838,000 headers with Equihash plus 449 aggregations), projected
+from the 512-header Equihash leaf: 272 GPU-hours, **$323** at $1.19/h, against **$775**
+for the same prover gas on the Succinct network at $0.12 per billion (before its base
+fee). One 5090 proves 1.88 headers/s; matching the network's price needs 0.79 at this
+hourly rate. Leaves are independent, so the wall time divides by the number of GPUs.
+Peak memory stays near 26 GB whatever the size, so a 24 GB card may not fit.
+
+In this run `gpu-bench` panicked after writing its results, while dropping the CUDA
+proving keys ("there is no reactor running", `sp1-cuda` `pk.rs:63`: its destructors call
+`tokio::spawn`, and the blocking SDK keeps its runtime private). The abort left
+`sp1-gpu-server` running and holding the output pipe, so `run.sh` never returned. Since
+fixed: `gpu-bench` drops the client and keys inside a tokio runtime, which also stops the
+server, and `run.sh` stops a leftover server if `gpu-bench` dies anyway. The fix has
+been checked on CPU only; the next GPU run is its first test there.
+
+Results: `gpu-bench/results/NVIDIA-GeForce-RTX-5090-20261021T171749Z.{jsonl,log}`.
