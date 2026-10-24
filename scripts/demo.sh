@@ -40,8 +40,10 @@ host() { # host DIR PORT
 }
 
 proxy() { # proxy NAME RINGS_PORT LISTEN_PORT MODE
+  # One Ring host per proxy: the demo isolates the content checks, so the tip policy's
+  # two-source rule (docs/tip-policy.md) is relaxed here.
   "$BIN/zylem-proxy" --listen "127.0.0.1:$3" --rings "http://127.0.0.1:$2" --upstream "$UPSTREAM" \
-    --checkpoint "$CHECKPOINT" --mode "$4" >"$OUT/proxy-$1.log" 2>&1 &
+    --checkpoint "$CHECKPOINT" --mode "$4" --min-sources 1 >"$OUT/proxy-$1.log" 2>&1 &
   PIDS+=($!)
   for _ in $(seq 1 60); do grep -qE "serving (Strict|Audit) mode|^Error" "$OUT/proxy-$1.log" && return; sleep 1; done
 }

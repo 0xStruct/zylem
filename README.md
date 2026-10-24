@@ -55,17 +55,19 @@ against every next header; the Ring's note commitments against the authenticated
 which authenticates every tree state; subtree roots older than the first Ring against
 the verified frontier; full transactions fetched upstream against their block.
 
-Not checked yet: the tip. There is no minimum chain work, the tip comes from one set of
-Ring hosts compared with one upstream server by height, and a lagging tip only logs a
-warning. Because Zcash adjusts difficulty every block, a private fork can lower its
-difficulty quickly: an endless fake chain costs about 26 honest blocks of work before
-NU7 (about 145 with NU7's 102-block window), so the difficulty rule alone does not stop
-an attacker who eclipses every source. Also not checked: the mempool and the
-completeness of transparent address lookups (relayed upstream). Query privacy (OHTTP,
-YPIR) is v1 and later.
+The tip ([docs/tip-policy.md](docs/tip-policy.md)): the checkpoint ships with a minimum
+chain work, every Ring host's tail is verified and the heaviest is served, Zakura or
+zcashd nodes act as header-only witnesses, and strict mode presents a tip only when at
+least two independent sources confirm it and none shows verified blocks beyond it or a
+heavier fork. Headers dated more than two hours ahead are rejected, and a tip older than
+about six minutes at 25-second blocks raises a stale-tip alarm.
 
-Assumption tier today: SPV with the full header rules from a checkpoint, plus
-authenticated transactions and shielded state, minus tip policy.
+Not checked yet: the mempool and the completeness of transparent address lookups
+(relayed upstream). Query privacy (OHTTP, YPIR) is v1 and later.
+
+Assumption tier today: SPV with the full header rules from a checkpoint and a
+minimum-work, multi-source tip policy, plus authenticated transactions and shielded
+state.
 
 ## Quick start (testnet)
 
@@ -82,10 +84,13 @@ cargo build --release
 # 3. Host them, and keep the open tail current.
 ./target/release/zylem-build serve --out data/testnet --rpc http://127.0.0.1:18232/ --finality 100
 
-# 4. Run the proxy and point a wallet at it.
+# 4. Run the proxy and point a wallet at it. The checkpoint carries its minimum chain
+#    work (checkpoints/testnet.json); repeat --rings for mirrors and add node witnesses.
 ./target/release/zylem-proxy --rings http://127.0.0.1:8090 \
+    --headers-rpc http://user:pass@127.0.0.1:18232/ \
     --upstream https://testnet.zec.rocks:443 \
-    --checkpoint 4500000:0000252837996ac6566d67241e6aa7916a6ba5ddcc46458b9682fc0e97860d71
+    --checkpoint "$(jq -r .checkpoint checkpoints/testnet.json)"
+./target/release/zylem-build probe --lwd http://127.0.0.1:9067   # tip status
 zcash-devtool wallet -w my-wallet sync --server 127.0.0.1:9067
 ```
 

@@ -62,7 +62,16 @@ fn equihash_chunk(first: u64, headers: &[Vec<u8>]) -> Option<u64> {
     })
 }
 
-pub async fn run(node: &Node, network: &Network, o: Options<'_>) -> Result<()> {
+/// What a replay established.
+pub struct Summary {
+    /// Hash of the block just before `from`.
+    pub anchor_hash: [u8; 32],
+    pub last_hash: [u8; 32],
+    /// Total work of the headers from `from` to `last_height`.
+    pub work: primitive_types::U256,
+}
+
+pub async fn run(node: &Node, network: &Network, o: Options<'_>) -> Result<Summary> {
     let n = net(network);
     let tip = match o.to {
         Some(t) => t,
@@ -107,6 +116,8 @@ pub async fn run(node: &Node, network: &Network, o: Options<'_>) -> Result<()> {
     let mut ctx: Vec<(u32, u32)> = Vec::with_capacity(MAX_CONTEXT + 1);
     let mut newest_first: Vec<(u32, u32)> = Vec::with_capacity(MAX_CONTEXT);
     let (mut checked, mut min_difficulty, mut cps_matched) = (0u64, 0u64, 0usize);
+    let mut anchor_hash = [0u8; 32];
+    let mut total_work = primitive_types::U256::zero();
     let min_bits = zylem_header::to_compact(n.limit());
     let starts: Vec<u64> = (start..=tip).step_by(CHUNK as usize).collect();
     let mut fetches = stream::iter(starts)
@@ -149,6 +160,7 @@ pub async fn run(node: &Node, network: &Network, o: Options<'_>) -> Result<()> {
                 check_contextual(n, height, time, bits, &newest_first)
                     .map_err(|f| anyhow::anyhow!("header {height} rejected: {f:?}"))?;
                 checked += 1;
+                total_work += zylem_header::work(target);
                 if bits == min_bits {
                     min_difficulty += 1;
                 }
@@ -167,6 +179,9 @@ pub async fn run(node: &Node, network: &Network, o: Options<'_>) -> Result<()> {
             ctx.push((bits, time));
             if ctx.len() > MAX_CONTEXT {
                 ctx.remove(0);
+            }
+            if height + 1 == o.from {
+                anchor_hash = hash;
             }
             prev_hash = Some(hash);
         }
@@ -196,7 +211,52 @@ pub async fn run(node: &Node, network: &Network, o: Options<'_>) -> Result<()> {
     for (u, h) in upgrades {
         println!("  crossed {u:?} at {h}");
     }
+    Ok(Summary { anchor_hash, last_hash: prev_hash.unwrap_or_default(), work: total_work })
+}
+
+/// A checkpoint as an auditable artifact: the block, and the work the honest chain
+/// carried from it to `release`, which every chain a client accepts must at least match.
+/// Written as `HEIGHT:HASH:MINWORK` for `zylem-proxy --checkpoint` and as JSON with how to
+/// reproduce it.
+pub async fn checkpoint(node: &Node, network: &Network, height: u64, release: Option<u64>, out: Option<&Path>) -> Result<()> {
+    let release = match release {
+        Some(r) => r,
+        // Deep enough that no reorganisation reaches it.
+        None => node.tip().await? - 100,
+    };
+    if release <= height {
+        bail!("release height {release} must be above the checkpoint {height}");
+    }
+    let o = Options { from: height + 1, to: Some(release), equihash: true, checkpoints: None, out: None };
+    let s = run(node, network, o).await?;
+    let hash = zylem_core::manifest::display_hash(&s.anchor_hash);
+    let line = format!("{height}:{hash}:{:x}", s.work);
+    println!("\ncheckpoint: {line}");
+    if let Some(p) = out {
+        let json = serde_json::json!({
+            "network": network_name(network),
+            "height": height,
+            "hash": hash,
+            "min_work_after": format!("{:x}", s.work),
+            "release_height": release,
+            "release_hash": zylem_core::manifest::display_hash(&s.last_hash),
+            "checkpoint": line,
+            "built": chrono_now(),
+            "reproduce": format!(
+                "zylem-build --network {} checkpoint --rpc <any node> --height {height} --release {release}",
+                network_name(network)
+            ),
+            "meaning": "every header from height+1 to release_height passed Zylem's header rules (Equihash, target, difficulty adjustment, median time); min_work_after is their total work",
+        });
+        std::fs::write(p, serde_json::to_string_pretty(&json)? + "\n")?;
+        println!("written: {}", p.display());
+    }
     Ok(())
+}
+
+fn chrono_now() -> String {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    format!("unix {secs}")
 }
 
 fn network_name(network: &Network) -> &'static str {

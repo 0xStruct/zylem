@@ -409,6 +409,14 @@ pub fn rebuild_txid(
     match aux.version {
         5 | 6 => {}
         4 => {
+            // A v4 ID is SHA-256d of the bytes, like a Merkle node of two 32-byte children,
+            // so a 64-byte "transaction" could stand in for a subtree (CVE-2017-12842) and
+            // hide the transactions under it. No valid v4 transaction is 64 bytes: it needs
+            // an input, and any input makes it longer. (v5 and v6 IDs are ZIP 244 BLAKE2b
+            // digests, which cannot equal a node.)
+            if aux.full_tx.len() == 64 {
+                return Err(Reject::SixtyFourByteTransaction { height, index });
+            }
             let tx = Transaction::read(&aux.full_tx[..], branch_for_height)
                 .map_err(|e| Reject::malformed("v4 transaction", e))?;
             if tx.version() != TxVersion::V4 {
@@ -449,4 +457,16 @@ pub fn rebuild_txid(
         return Err(Reject::malformed("aux", "Ironwood data in a v5 transaction"));
     }
     Ok(h.finalize().as_bytes().try_into().unwrap())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sixty_four_byte_v4_transactions_are_rejected() {
+        let aux = TxAux { version: 4, full_tx: vec![0x04; 64], ..Default::default() };
+        let r = rebuild_txid(500_000, 3, &CompactTx::default(), &aux, BranchId::Sapling);
+        assert_eq!(r, Err(Reject::SixtyFourByteTransaction { height: 500_000, index: 3 }));
+    }
 }

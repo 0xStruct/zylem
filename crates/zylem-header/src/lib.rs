@@ -52,7 +52,8 @@ impl Net {
     fn nu7_active(self, h: u64) -> bool {
         self.nu7().is_some_and(|a| h >= a)
     }
-    fn spacing(self, h: u64) -> i64 {
+    /// Target block spacing in seconds at height `h`.
+    pub fn spacing(self, h: u64) -> i64 {
         if self.nu7_active(h) {
             25
         } else if h >= self.blossom() {

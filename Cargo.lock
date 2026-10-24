@@ -3292,6 +3292,7 @@ dependencies = [
  "clap",
  "futures",
  "hex",
+ "primitive-types",
  "prost",
  "reqwest",
  "serde_json",

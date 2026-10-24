@@ -1,0 +1,12 @@
+{
+  "built": "unix 1792613683",
+  "checkpoint": "4500000:0000252837996ac6566d67241e6aa7916a6ba5ddcc46458b9682fc0e97860d71:2450840d9",
+  "hash": "0000252837996ac6566d67241e6aa7916a6ba5ddcc46458b9682fc0e97860d71",
+  "height": 4500000,
+  "meaning": "every header from height+1 to release_height passed Zylem's header rules (Equihash, target, difficulty adjustment, median time); min_work_after is their total work",
+  "min_work_after": "2450840d9",
+  "network": "testnet",
+  "release_hash": "000029402a817f6431e108e7325fce694392705a0fe0c5e6c606907a79d69042",
+  "release_height": 4526500,
+  "reproduce": "zylem-build --network testnet checkpoint --rpc <any node> --height 4500000 --release 4526500"
+}

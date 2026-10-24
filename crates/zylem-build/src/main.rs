@@ -131,6 +131,26 @@ enum Cmd {
         #[arg(long)]
         out: Option<std::path::PathBuf>,
     },
+    /// Ask a light-wallet server (or zylem-proxy) for its tip, as a wallet's first sync
+    /// call does, and print its vendor string.
+    Probe {
+        #[arg(long)]
+        lwd: String,
+    },
+    /// Make a checkpoint with its minimum chain work: replays every header from the
+    /// checkpoint to the release height and sums their work.
+    Checkpoint {
+        #[arg(long)]
+        rpc: String,
+        #[arg(long)]
+        height: u64,
+        /// Last header whose work counts (default: 100 below the node's tip).
+        #[arg(long)]
+        release: Option<u64>,
+        /// Also write the checkpoint as JSON, with how to reproduce it.
+        #[arg(long)]
+        out: Option<std::path::PathBuf>,
+    },
 }
 
 fn network(name: &str) -> Network {
@@ -147,7 +167,20 @@ async fn main() -> Result<()> {
     match cli.cmd {
         Cmd::ReplayHeaders { rpc, from, to, no_equihash, checkpoints, out } => {
             let o = replay::Options { from, to, equihash: !no_equihash, checkpoints: checkpoints.as_deref(), out: out.as_deref() };
-            replay::run(&node::Node::new(&rpc), &net, o).await
+            replay::run(&node::Node::new(&rpc), &net, o).await.map(|_| ())
+        }
+        Cmd::Probe { lwd } => {
+            let mut c = lwd::connect(&lwd).await?;
+            let info = c.get_lightd_info(zylem_proto::rpc::Empty {}).await?.into_inner();
+            println!("vendor: {}", info.vendor);
+            match c.get_latest_block(zylem_proto::rpc::ChainSpec {}).await {
+                Ok(b) => println!("latest block: {}", b.into_inner().height),
+                Err(e) => println!("latest block refused: {:?}: {}", e.code(), e.message()),
+            }
+            Ok(())
+        }
+        Cmd::Checkpoint { rpc, height, release, out } => {
+            replay::checkpoint(&node::Node::new(&rpc), &net, height, release, out.as_deref()).await
         }
         Cmd::Spike { rpc, from, count } => spike::run(&node::Node::new(&rpc), net, from, count).await,
         Cmd::Backfill { rpc, lwd, out, epoch_length, finality, max_rings } => {

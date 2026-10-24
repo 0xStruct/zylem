@@ -12,6 +12,10 @@ pub enum Reject {
     TargetNotMet { height: u64 },
     #[error("header at height {height} breaks the difficulty or time rules: {detail}")]
     ContextInvalid { height: u64, detail: String },
+    #[error("header at height {height} is dated more than two hours ahead of this clock")]
+    FutureTime { height: u64 },
+    #[error("transaction {index} at height {height} is 64 bytes, the size of a Merkle node")]
+    SixtyFourByteTransaction { height: u64, index: usize },
     #[error("header at height {height} does not link to its predecessor")]
     BrokenChain { height: u64 },
     #[error("block {height} does not match the checkpoint")]

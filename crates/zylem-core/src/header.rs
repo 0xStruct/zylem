@@ -34,6 +34,7 @@ impl Header {
         if bytes.len() != HEADER_SIZE {
             return Err(Reject::malformed("header", format!("{} bytes", bytes.len())));
         }
+        zylem_header::check_encoding(bytes).map_err(|_| Reject::malformed("header", "solution length is not fd 40 05"))?;
         let h = BlockHeader::read(bytes).map_err(|e| Reject::malformed("header", e))?;
         let target = expand_bits(h.bits).ok_or(Reject::TargetNotMet { height })?;
         Ok(Header {
@@ -71,6 +72,50 @@ pub use zylem_header::{expand as expand_bits, work as work_from_target};
 /// Work for a compact `nBits`, or zero if the encoding is invalid.
 pub fn work_from_bits(bits: u32) -> U256 {
     expand_bits(bits).map(work_from_target).unwrap_or_default()
+}
+
+/// How far ahead of a verifier's clock a header may be dated, as consensus allows.
+pub const MAX_FUTURE_SECS: u64 = 2 * 60 * 60;
+
+impl Header {
+    /// Rejects a header dated more than two hours after `now` (Unix seconds). Nodes refuse
+    /// such headers, so only a forger serves them.
+    pub fn check_not_future(&self, now: u64) -> Result<(), Reject> {
+        if self.time as u64 > now + MAX_FUTURE_SECS {
+            return Err(Reject::FutureTime { height: self.height });
+        }
+        Ok(())
+    }
+}
+
+/// A run of headers checked as a chain from a verified `prev` with its context: every
+/// header parses, passes Equihash and its target, links, and follows the difficulty and
+/// time rules. Used for header-only sources that witness the tip.
+pub struct HeaderRun {
+    pub headers: Vec<Header>,
+    pub work: U256,
+    pub context: DifficultyContext,
+}
+
+pub fn verify_run(network: &Network, prev: &Header, context: &DifficultyContext, raw: &[Vec<u8>]) -> Result<HeaderRun, Reject> {
+    let mut context = context.clone();
+    let mut prev_hash = prev.hash;
+    let mut headers = Vec::with_capacity(raw.len());
+    let mut work = U256::zero();
+    for (i, bytes) in raw.iter().enumerate() {
+        let height = prev.height + 1 + i as u64;
+        let h = Header::parse_and_check(height, bytes)?;
+        if h.prev_hash != prev_hash {
+            return Err(Reject::BrokenChain { height });
+        }
+        if !context.check_and_push(network, &h)? {
+            return Err(Reject::ContextInvalid { height, detail: "not enough predecessors to check".into() });
+        }
+        prev_hash = h.hash;
+        work += h.work;
+        headers.push(h);
+    }
+    Ok(HeaderRun { headers, work, context })
 }
 
 fn net(network: &Network) -> Net {
@@ -120,6 +165,13 @@ mod tests {
             bits,
             work: U256::zero(),
         }
+    }
+
+    #[test]
+    fn headers_more_than_two_hours_ahead_are_rejected() {
+        let h = header(10, 0, 1_800_007_200);
+        assert_eq!(h.check_not_future(1_800_000_000), Ok(()));
+        assert_eq!(h.check_not_future(1_799_999_999), Err(Reject::FutureTime { height: 10 }));
     }
 
     #[test]

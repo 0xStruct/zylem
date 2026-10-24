@@ -59,6 +59,8 @@ pub struct Proxy {
     pub network: Network,
     pub mode: Mode,
     pub stats: Arc<Stats>,
+    /// The tip policy's latest verdict.
+    pub tip_status: Arc<RwLock<crate::tip::Status>>,
     pre_subtrees: Mutex<HashMap<Pool, Vec<SubtreeRoot>>>,
 }
 
@@ -98,8 +100,15 @@ fn tree_state(network: &Network, b: &BlockEntry) -> TreeState {
 }
 
 impl Proxy {
-    pub fn new(chain: Arc<RwLock<Chain>>, upstream: Upstream, network: Network, mode: Mode, stats: Arc<Stats>) -> Self {
-        Proxy { chain, upstream, network, mode, stats, pre_subtrees: Mutex::new(HashMap::new()) }
+    pub fn new(
+        chain: Arc<RwLock<Chain>>,
+        upstream: Upstream,
+        network: Network,
+        mode: Mode,
+        stats: Arc<Stats>,
+        tip_status: Arc<RwLock<crate::tip::Status>>,
+    ) -> Self {
+        Proxy { chain, upstream, network, mode, stats, tip_status, pre_subtrees: Mutex::new(HashMap::new()) }
     }
 
     fn up(&self) -> Upstream {
@@ -263,6 +272,12 @@ impl CompactTxStreamer for Proxy {
         if self.mode == Mode::Audit {
             return self.up().get_latest_block(req.into_inner()).await;
         }
+        // Wallets start every sync here, so a tip the policy rejects stops them visibly.
+        let st = self.tip_status.read().await;
+        if !st.ok() {
+            return Err(Status::unavailable(format!("zylem: {}", st.summary())));
+        }
+        drop(st);
         let chain = self.chain.read().await;
         let tip = chain.tip().ok_or_else(|| Status::unavailable("zylem: nothing verified yet"))?;
         Ok(Response::new(BlockId { height: tip.header.height, hash: tip.header.hash.to_vec() }))
@@ -480,7 +495,8 @@ impl CompactTxStreamer for Proxy {
                 info.estimated_height = info.estimated_height.max(tip.header.height);
             }
         }
-        info.vendor = format!("zylem-proxy ({:?}) over {}", self.mode, info.vendor);
+        let tip = self.tip_status.read().await.summary();
+        info.vendor = format!("zylem-proxy ({:?}, {tip}) over {}", self.mode, info.vendor);
         Ok(Response::new(info))
     }
 

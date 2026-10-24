@@ -81,5 +81,4 @@ cargo test --test replay                                       # needs the repla
   the upgrade's activation, which needs every block's roots since then; the Rings start
   later. The real chain already checks both (every header's commitment, every Ring's
   tree roots).
-- Tip policy: minimum chain work, highest-work tip across sources, a future-time limit
-  and a wall-clock stale-tip alarm.
+- Tip policy: done after this phase's first part, see [tip-policy.md](tip-policy.md).
