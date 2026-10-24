@@ -1,0 +1,235 @@
+<title>Zylem Verifier</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single working column of check panels, each with its action, result and tamper control. */
+:root {
+  --paper: #f1f4ef; --paper-2: #e7ece5; --ink: #142019; --muted: #56645b; --rule: #d3dbd2;
+  --accent: #1d6b47; --accent-tint: #d4ebdc; --bad: #a3392b; --bad-tint: #f6e1dd;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #f08a7a; --bad-tint: #3a1d18; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #f08a7a; --bad-tint: #3a1d18; color-scheme: dark; }
+body { background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 800; line-height: 1.05; }
+h2 { font-size: 1.25rem; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent); }
+.eyebrow { font: 500 0.75rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--muted); max-width: 64ch; margin-top: 10px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+header.top { display: grid; gap: 8px; margin-bottom: 24px; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 0.92rem; color: var(--muted); }
+.summary b { color: var(--ink); font-weight: 600; }
+.panels { display: grid; gap: 16px; }
+.panel { border: 1px solid var(--rule); border-radius: 12px; padding: 18px 20px; display: grid; gap: 12px; background: var(--paper); min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; }
+.panel-head p { color: var(--muted); font-size: 0.92rem; flex: 1 1 360px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: 600 0.9rem/1 var(--body); padding: 10px 15px; border-radius: 999px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--paper); cursor: pointer; }
+button.ghost { background: none; color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input, select { font: 400 0.95rem/1.2 var(--mono); padding: 9px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); max-width: 100%; }
+label { font-size: 0.9rem; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
+.result { border-radius: 8px; padding: 12px 14px; font-size: 0.92rem; background: var(--paper-2); min-width: 0; overflow-wrap: anywhere; }
+.result.ok { background: var(--accent-tint); }
+.result.bad { background: var(--bad-tint); }
+.verdict { font: 600 0.78rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.ok .verdict { color: var(--accent); }
+.bad .verdict { color: var(--bad); }
+.kv { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: 4px 14px; margin-top: 8px; font-size: 0.88rem; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+.rings { display: grid; gap: 8px; }
+.ring-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; border-top: 1px solid var(--rule); padding-top: 8px; }
+.ring-row .mono { font-size: 0.88rem; }
+footer { margin-top: 28px; color: var(--muted); font-size: 0.88rem; }
+@media (max-width: 560px) { .kv { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Zylem · testnet</p>
+    <h1>Check Zcash history in your browser</h1>
+    <p class="lede">This page downloads one history proof and the block records it commits to, then verifies them here with Zylem's WebAssembly verifier. Nothing is taken on the host's word; flip a byte to watch a check fail.</p>
+    <div class="summary" id="summary"><span>Loading the published history…</span></div>
+  </header>
+
+  <div class="panels">
+    <section class="panel" aria-labelledby="p1">
+      <div class="panel-head"><h2 id="p1">History proof</h2><p>The SP1 proof that every header in the range follows Zcash's rules, Equihash included, checked against the programs and starting block this page trusts.</p></div>
+      <div class="controls"><button type="button" id="b-proof">Verify the proof</button><label><input type="checkbox" id="t-proof"> Flip a byte in the proof</label><label><input type="checkbox" id="t-claim"> Change the claimed work</label></div>
+      <div class="result" id="r-proof" aria-live="polite">Not checked yet.</div>
+    </section>
+
+    <section class="panel" aria-labelledby="p2">
+      <div class="panel-head"><h2 id="p2">Every block record</h2><p>Recompute the commitment from all block records (hash, Merkle root, block commitments, time, difficulty) and compare it with the one the proof states.</p></div>
+      <div class="controls"><button type="button" id="b-all">Check all records</button><label><input type="checkbox" id="t-all"> Alter one record</label></div>
+      <div class="result" id="r-all" aria-live="polite">Not checked yet.</div>
+    </section>
+
+    <section class="panel" aria-labelledby="p3">
+      <div class="panel-head"><h2 id="p3">Look up a block</h2><p>Prove one block's record against the proof with a handful of sibling hashes, as a wallet would without the rest of the history.</p></div>
+      <div class="controls"><label for="height">Height</label><input id="height" type="number" inputmode="numeric"><button type="button" id="b-block">Check this block</button><button type="button" class="ghost" id="b-random">Random block</button></div>
+      <div class="result" id="r-block" aria-live="polite">Not checked yet.</div>
+    </section>
+
+    <section class="panel" aria-labelledby="p4">
+      <div class="panel-head"><h2 id="p4">Rings</h2><p>Each sealed Ring inside the proven range comes with published sibling hashes that bind its blocks' records to the proof. Content checks of the Ring itself run in the proxy.</p></div>
+      <div class="rings" id="rings"><p class="lede">No Ring bindings in this publication.</p></div>
+    </section>
+
+    <section class="panel" aria-labelledby="p5" id="g-panel" hidden>
+      <div class="panel-head"><h2 id="p5">Groth16 wrap</h2><p>The same claim in a 356-byte proof for blockchains. It relies on SP1's Groth16 setup and verifies slower off-chain than the proof above.</p></div>
+      <div class="controls"><button type="button" id="b-g">Verify the Groth16 proof</button></div>
+      <div class="result" id="r-g" aria-live="polite">Not checked yet.</div>
+    </section>
+  </div>
+  <footer>Testnet data. The page trusts only the starting block, its difficulty context and the two program keys listed in the proof result; everything else is checked.</footer>
+</div>
+
+<script type="module">
+import init, * as zv from "./pkg/zylem_wasm_verify.js";
+
+const $ = (id) => document.getElementById(id);
+// Binary files travel as base64 text where a host serves only text types.
+const fetchBytes = async (p) => {
+  const res = await fetch(p);
+  if (!res.ok) throw new Error(`${p}: ${res.status}`);
+  if (!p.endsWith(".b64.txt")) return new Uint8Array(await res.arrayBuffer());
+  const s = atob((await res.text()).trim());
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+};
+const fmt = (n) => n.toLocaleString("en-US");
+const hexToBytes = (h) => new Uint8Array(h.match(/../g).map((b) => parseInt(b, 16)));
+let H, proof, pv, records, groth, REG;
+// Generation 1: the registry roots this page trusts. A wallet compiles these in; stage.py
+// fills them in for the demo.
+const PINNED_ROOTS = [/*PINNED_ROOTS*/];
+
+function show(el, ok, title, rows, note) {
+  el.className = "result " + (ok ? "ok" : "bad");
+  const kv = rows ? `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>` : "";
+  el.innerHTML = `<span class="verdict">${ok ? "Verified" : "Rejected"}</span> ${title}${note ? `<br>${note}` : ""}${kv}`;
+}
+function timed(f) {
+  const t = performance.now();
+  try { return { ok: true, value: f(), ms: performance.now() - t }; }
+  catch (e) { return { ok: false, error: e.message || String(e), ms: performance.now() - t }; }
+}
+const flip = (bytes, at) => { const b = new Uint8Array(bytes); b[at] ^= 1; return b; };
+
+function trusted() {
+  const anchor = { height: H.anchor.height, hash: H.anchor.hash_internal, context_hash: H.anchor.context_hash };
+  // Generation 0 pins both program keys; generation 1 pins registry roots instead.
+  if (H.generation === 1) return JSON.stringify({ anchor });
+  return JSON.stringify({ leaf_vk: H.programs.leaf.hash_u32, agg_vk: H.programs.aggregation.hash_u32, anchor });
+}
+
+function checkProof() {
+  const gen1 = H.generation === 1;
+  let p = proof, v = pv;
+  if ($("t-proof").checked) p = flip(proof, Math.floor(proof.length / 2));
+  // Flip the last byte of the claimed work (v1: offset 208, v2: 216).
+  if ($("t-claim").checked) v = flip(pv, (gen1 ? 216 : 208) + 31);
+  const r = gen1
+    ? timed(() => JSON.parse(zv.verify_history_v2(p, v, REG, JSON.stringify(PINNED_ROOTS), trusted())))
+    : timed(() => JSON.parse(zv.verify_history(p, v, hexToBytes(H.programs.aggregation.koalabear_bincode_hex), trusted())));
+  if (r.ok) {
+    const c = r.value;
+    show($("r-proof"), true, `in ${r.ms.toFixed(1)} ms`, [
+      ["Heights", `${fmt(c.first_height)} to ${fmt(c.last_height)}`],
+      ["Leaves joined", fmt(c.leaves)],
+      ["Equihash checked", c.equihash_checked ? "yes, every header" : "no"],
+      ["Total work", "0x" + c.work.replace(/^0+/, "")],
+      ["Last block", c.last_hash.match(/../g).reverse().join("")],
+      ["Trusted start", `block ${fmt(H.anchor.height)} · ${H.anchor.hash}`],
+      ...(gen1
+        ? [["Registry root (pinned)", c.registry_root], ["Made under registry", c.made_under], ["Aggregation program", c.aggregation_key]]
+        : [["Leaf program", H.programs.leaf.bytes32], ["Aggregation program", H.programs.aggregation.bytes32]]),
+      ["Proof size", `${fmt(proof.length)} bytes`],
+    ]);
+  } else show($("r-proof"), false, `after ${r.ms.toFixed(1)} ms`, null, `<span class="mono">${r.error}</span>`);
+}
+
+function checkAll() {
+  let rec = records;
+  if ($("t-all").checked) rec = flip(records, 104 * Math.floor(records.length / 208) + 40);
+  const r = timed(() => JSON.parse(zv.check_all_records(pv, rec)));
+  if (r.ok) show($("r-all"), true, `${fmt(r.value.records)} block records match the proof, in ${r.ms.toFixed(1)} ms`);
+  else show($("r-all"), false, `after ${r.ms.toFixed(1)} ms`, null, `<span class="mono">${r.error}</span>`);
+}
+
+function checkBlock() {
+  const h = Number($("height").value);
+  const r = timed(() => JSON.parse(zv.check_range(pv, records, h, h)));
+  if (r.ok) {
+    const x = r.value.first_record;
+    show($("r-block"), true, `block ${fmt(h)}, with ${r.value.sibling_hashes} sibling hashes, in ${r.ms.toFixed(1)} ms`, [
+      ["Block hash", x.hash], ["Merkle root", x.merkle_root], ["Block commitments", x.block_commitments],
+      ["Time", new Date(x.time * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC"], ["Difficulty bits", x.bits],
+    ]);
+  } else show($("r-block"), false, `block ${fmt(h)}`, null, `<span class="mono">${r.error}</span>`);
+}
+
+async function checkRing(b, el) {
+  const bind = await (await fetch("data/" + b.binding)).json();
+  const first = H.covers.first;
+  const slice = records.slice((b.from - first) * 104, (b.to - first + 1) * 104);
+  const r = timed(() => JSON.parse(zv.verify_binding(pv, b.from, slice, JSON.stringify(bind.paths))));
+  if (r.ok) show(el, true, `${fmt(b.to - b.from + 1)} blocks bound with ${r.value.sibling_hashes} sibling hashes, in ${r.ms.toFixed(1)} ms`);
+  else show(el, false, "", null, `<span class="mono">${r.error}</span>`);
+}
+
+function checkGroth() {
+  const r = timed(() => zv.verify_groth16(groth, pv, H.programs.aggregation.bytes32));
+  if (r.ok) show($("r-g"), true, `${fmt(groth.length)} bytes, in ${r.ms.toFixed(1)} ms`);
+  else show($("r-g"), false, "", null, `<span class="mono">${r.error}</span>`);
+}
+
+async function main() {
+  try {
+    await init("./pkg/zylem_wasm_verify_bg.wasm");
+    H = await (await fetch("data/history.json")).json();
+    [proof, pv, records] = await Promise.all([fetchBytes("data/" + H.proof), fetchBytes("data/" + H.public_values), fetchBytes("data/" + H.records)]);
+    if (H.generation === 1) REG = await (await fetch("data/" + H.programs.registry)).text();
+    const sp1 = H.generation === 1 ? JSON.parse(REG).entries[0].sp1_version : H.programs.sp1_version;
+    $("summary").innerHTML = `<span>Heights <b class="mono">${fmt(H.covers.first)}–${fmt(H.covers.last)}</b></span><span><b>${fmt(H.covers.leaves)}</b> leaves of 512</span><span>proof <b>${(proof.length / 1e6).toFixed(2)} MB</b></span><span>records <b>${(records.length / 1e6).toFixed(1)} MB</b></span><span>SP1 <b>${sp1}</b></span><span>generation <b>${H.generation ?? 0}</b></span>`;
+    $("height").value = H.covers.last;
+    $("height").min = H.covers.first; $("height").max = H.covers.last;
+    if (H.bindings.length) {
+      $("rings").innerHTML = "";
+      for (const b of H.bindings) {
+        const row = document.createElement("div");
+        row.className = "ring-row";
+        row.innerHTML = `<span class="mono">Ring ${fmt(b.from)}–${fmt(b.to)}</span>`;
+        const btn = document.createElement("button"); btn.type = "button"; btn.className = "ghost"; btn.textContent = "Check binding";
+        const res = document.createElement("div"); res.className = "result"; res.style.flexBasis = "100%"; res.hidden = true;
+        btn.onclick = () => { res.hidden = false; checkRing(b, res); };
+        row.append(btn, res); $("rings").append(row);
+      }
+    }
+    if (H.groth16) { groth = await fetchBytes("data/" + H.groth16); $("g-panel").hidden = false; }
+    $("b-proof").onclick = checkProof; $("t-proof").onchange = checkProof; $("t-claim").onchange = checkProof;
+    $("b-all").onclick = checkAll; $("t-all").onchange = checkAll;
+    $("b-block").onclick = checkBlock;
+    $("b-random").onclick = () => { $("height").value = H.covers.first + Math.floor(Math.random() * (H.covers.last - H.covers.first + 1)); checkBlock(); };
+    $("b-g").onclick = checkGroth;
+    checkProof(); checkAll(); checkBlock();
+  } catch (e) {
+    $("summary").innerHTML = `<span>Could not load the verifier or the published files: ${e.message}</span>`;
+  }
+}
+main();
+</script>

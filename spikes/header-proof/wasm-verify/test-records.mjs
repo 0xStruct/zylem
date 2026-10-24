@@ -1,0 +1,11 @@
+import { readFileSync } from "node:fs";
+const m = await import(process.cwd() + "/pkg-node/zylem_wasm_verify.js");
+const pv = readFileSync("../../../data/jobs/mocktest-out/history.pv");
+const recs = readFileSync("../../../data/jobs/mocktest/records.bin");
+const t = (f) => { const s = performance.now(); try { const r = f(); return `${(performance.now() - s).toFixed(1)} ms ${r ?? "ok"}`; } catch (e) { return `rejected: ${e.message}`; } };
+console.log("all records:", t(() => m.check_all_records(pv, recs)));
+console.log("one block:", t(() => m.check_range(pv, recs, 4528000, 4528000)));
+console.log("a range:", t(() => m.check_range(pv, recs, 4527600, 4528900)));
+const bad = Buffer.from(recs); bad[104 * 700 + 40] ^= 1;
+console.log("tampered record:", t(() => m.check_all_records(pv, bad)));
+console.log("out of range:", t(() => m.check_range(pv, recs, 4527000, 4527100)));

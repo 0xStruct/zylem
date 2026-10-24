@@ -387,3 +387,59 @@ Findings:
   history proof.
 - Building with gnark natively (`--features native-gnark`) needs Go and `PROTOC`; the
   default path runs gnark in Docker, which Docker Desktop limits to 8 GB here.
+
+## Generation 1: frozen programs and a registry
+
+Until now a proof's program keys came from whichever binary was built, so any source
+edit made a new key and orphaned every earlier proof. Generation 1 separates the two:
+
+- **Frozen programs.** `programs/<network>/` holds compiled programs as files with
+  their keys. `prove` loads them from there and checks each file's hash and key, so pods
+  only need the same directory, not the same binary.
+- **Registry.** `programs/<network>/registry.json` is an append-only list: *allow* a key
+  for a claim kind, network, era and height range, or *revoke* a key from a height on.
+  Its root is a chained SHA-256 over the entries (`Registry` in `zylem-header`).
+- **Claim v2** (`Claim` in `zylem-header`): magic `ZYLC`, version 2, kind, network, era,
+  registry root and the aggregation's own key, then the v1 fields. 253 bytes plus 41
+  per peak. Version 1 claims still decode with `RangeClaim`.
+- **Programs.** `sp1/leaf-v2` (one source for every era; the claim states its era) and
+  `sp1/agg-v2`, which holds no Zcash rules: it is given the registry and a key per child,
+  admits a leaf only if its key is allowed for that era and those heights and not
+  revoked for them, admits an aggregate only if its key is allowed and no revocation
+  added after the registry it was made under reaches its heights, and states the root.
+- **Client.** `verify_history_v2` in `wasm-verify` pins registry roots instead of keys.
+  The aggregation key in the claim doubles as the STARK verifier's key.
+
+```
+programs freeze programs/testnet --kind leaf --net test --era 2 --first 4465026
+programs freeze programs/testnet --kind aggregate --net test
+programs revoke programs/testnet --key HEX [--from HEIGHT]
+prove leaves|aggregate programs/testnet JOBS OUT --shard I
+prove join programs/testnet OUT SHARD_PROOF... [--groth16]
+zylem-build publish ... --registry programs/testnet
+PROGRAMS=programs/testnet pipeline/run-shard.sh I     # on a pod
+```
+
+Open ends are stored as 2^53 − 1, the largest integer JavaScript keeps exact, so
+`registry.json` passes through a browser unchanged. A rebuilt aggregation came out with
+different bytes after an edit that only moved lines in `registry.rs` (panic locations are
+embedded), which is the brittleness freezing removes: the registered file stays the one
+used.
+
+Tested 2026-10-23 on the M2 Pro (16 GB):
+
+- `zylem-header`: 10 registry tests (round trips, prefix roots, era and height scope,
+  two leaf programs of one era mixing, revocation, retirement below a cutoff, stale and
+  foreign aggregate children, aggregation keys, malformed children).
+- Mock prover, the 3-leaf `mocktest` jobs: leaves, a 2-leaf shard, a 1-leaf shard joined
+  as a leaf child, history proof under the registry. Retiring the leaf key from 4,528,600
+  in a copy of the registry refuses the join that reaches it and still joins the two
+  leaves below it.
+- Real CPU proofs: two 4-header leaves without Equihash (69 s and 64 s), joined by the
+  registry-checking aggregation in 96 s (25.5 GB peak footprint, swap included). The
+  1,272,546-byte proof verifies in WebAssembly under the claim's key in 54 ms with the
+  root pinned; a wrong anchor, altered claim or altered proof are refused, and the
+  accepting path stops at `EquihashNotChecked` as it should for these leaves.
+- `wasm-verify/test-registry.mjs` on the mock publish: unpinned or edited registry,
+  aggregation key not registered, registry grown by an allow, revocation reaching the
+  range, wrong anchor.

@@ -14,6 +14,9 @@ use primitive_types::{U256, U512};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod registry;
+pub use registry::*;
+
 pub const HEADER_SIZE: usize = 1_487;
 const EQUIHASH_INPUT: usize = 108;
 /// The solution's length, 1,344, as a compact size: the only encoding consensus accepts.
@@ -47,6 +50,18 @@ impl Net {
         match self {
             Net::Main => None,
             Net::Test => Some(4_465_026),
+        }
+    }
+    /// The header-rule era of height `h`: the rules change at Blossom (spacing) and at
+    /// NU7 (spacing and averaging window). A leaf proves headers of one era only, so each
+    /// era can map to its own leaf program.
+    pub fn era(self, h: u64) -> u8 {
+        if self.nu7_active(h) {
+            2
+        } else if h >= self.blossom() {
+            1
+        } else {
+            0
         }
     }
     fn nu7_active(self, h: u64) -> bool {
@@ -109,6 +124,10 @@ pub enum Fail {
     TimeTooEarly,
     TimeTooLate,
     ShortContext,
+    /// The header's version is below 4, which consensus has required since Overwinter.
+    Version,
+    /// The headers span a change of header rules (Blossom or NU7).
+    CrossesUpgrade,
 }
 
 pub fn sha256d(data: &[u8]) -> [u8; 32] {
@@ -307,6 +326,9 @@ pub fn context_needed(net: Net, height: u64) -> usize {
 pub fn check_encoding(header: &[u8]) -> Result<(), Fail> {
     if header.len() != HEADER_SIZE || header[EQUIHASH_INPUT + 32..EQUIHASH_INPUT + 35] != SOLUTION_LENGTH {
         return Err(Fail::Size);
+    }
+    if i32::from_le_bytes(header[..4].try_into().unwrap()) < 4 {
+        return Err(Fail::Version);
     }
     Ok(())
 }
@@ -568,6 +590,17 @@ pub struct Input {
     pub check_equihash: bool,
 }
 
+/// One unit of proving work: a leaf's input and its headers, as job files carry it.
+#[derive(Serialize, Deserialize)]
+pub struct LeafJob {
+    pub input: Input,
+    pub headers: Vec<u8>,
+}
+
+/// Headers per leaf. Leaves start at an upgrade's activation height plus a multiple of
+/// this, the same anchoring as Rings (4,096 = 8 leaves), so no leaf crosses an upgrade.
+pub const LEAF_SIZE: u64 = 512;
+
 /// What a proof publishes.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Output {
@@ -598,6 +631,10 @@ pub fn context_hash(context: &[(u32, u32)]) -> [u8; 32] {
 
 /// Proves a run of headers: the whole guest, also runnable natively.
 pub fn run(input: &Input, headers: &[u8]) -> Result<Output, (u64, Fail)> {
+    let last = input.first_height + (input.count as u64).saturating_sub(1);
+    if input.net.era(input.first_height) != input.net.era(last) {
+        return Err((input.first_height, Fail::CrossesUpgrade));
+    }
     let mut ctx: Vec<(u32, u32)> = input.context.clone();
     let mut prev_hash = input.anchor_hash;
     let mut total = U256::zero();
@@ -655,9 +692,37 @@ mod tests {
     }
 
     #[test]
+    fn version_below_four_is_rejected() {
+        let mut header = [0u8; HEADER_SIZE];
+        header[140..143].copy_from_slice(&SOLUTION_LENGTH);
+        header[..4].copy_from_slice(&4i32.to_le_bytes());
+        assert_eq!(check_encoding(&header), Ok(()));
+        header[..4].copy_from_slice(&3i32.to_le_bytes());
+        assert_eq!(check_encoding(&header), Err(Fail::Version));
+    }
+
+    #[test]
+    fn a_leaf_cannot_cross_an_upgrade() {
+        let input = |first: u64, count: u32| Input {
+            net: Net::Test,
+            first_height: first,
+            anchor_hash: [0; 32],
+            context: Vec::new(),
+            count,
+            check_equihash: false,
+        };
+        // NU7 activates on testnet at 4,465,026.
+        assert_eq!(run(&input(4_465_000, 100), &[]).unwrap_err(), (4_465_000, Fail::CrossesUpgrade));
+        assert_eq!(Net::Test.era(4_465_025), 1);
+        assert_eq!(Net::Test.era(4_465_026), 2);
+        assert_eq!(Net::Main.era(653_599), 0);
+    }
+
+    #[test]
     fn solution_length_must_be_canonical() {
         let mut header = [0u8; HEADER_SIZE];
         header[140..143].copy_from_slice(&SOLUTION_LENGTH);
+        header[..4].copy_from_slice(&4i32.to_le_bytes());
         assert_eq!(check_encoding(&header), Ok(()));
         // Other encodings of 1,344, or other lengths, change the block hash without
         // changing Equihash's input.

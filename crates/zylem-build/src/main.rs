@@ -3,7 +3,9 @@
 mod builder;
 mod lwd;
 mod lwdcheck;
+mod jobs;
 mod node;
+mod publish;
 mod replay;
 mod serve;
 mod spike;
@@ -131,6 +133,52 @@ enum Cmd {
         #[arg(long)]
         out: Option<std::path::PathBuf>,
     },
+    /// Cut the header chain into proving jobs: leaves of 512 headers anchored at an
+    /// upgrade's activation, each checked natively and written as a self-contained file.
+    Jobs {
+        #[arg(long)]
+        rpc: String,
+        /// Activation height of the upgrade the leaves are anchored at.
+        #[arg(long)]
+        activation: u64,
+        /// First leaf to write (default: the activation height).
+        #[arg(long)]
+        from: Option<u64>,
+        /// Last height to cover (default: 100 below the tip).
+        #[arg(long)]
+        to: Option<u64>,
+        /// Number of contiguous shards, one per prover.
+        #[arg(long, default_value_t = 1)]
+        shards: usize,
+        /// Headers per leaf; smaller only for quick proving tests.
+        #[arg(long, default_value_t = zylem_header::LEAF_SIZE, hide = true)]
+        leaf_size: u64,
+        #[arg(long)]
+        out: std::path::PathBuf,
+    },
+    /// Lay out what a host serves: Rings, the history proof, its records and Ring bindings.
+    Publish {
+        /// `jobs` output directory (anchor and records).
+        #[arg(long)]
+        jobs: std::path::PathBuf,
+        /// `export-proof` prefix of the history proof.
+        #[arg(long)]
+        history: std::path::PathBuf,
+        /// Generation 0: the prover's vks.json.
+        #[arg(long)]
+        vks: Option<std::path::PathBuf>,
+        /// Generation 1: the programs directory with registry.json.
+        #[arg(long)]
+        registry: Option<std::path::PathBuf>,
+        /// Ring directory with its manifest.
+        #[arg(long)]
+        rings: std::path::PathBuf,
+        /// A Groth16 wrap of the history proof (raw bytes), if made.
+        #[arg(long)]
+        groth16: Option<std::path::PathBuf>,
+        #[arg(long)]
+        out: std::path::PathBuf,
+    },
     /// Ask a light-wallet server (or zylem-proxy) for its tip, as a wallet's first sync
     /// call does, and print its vendor string.
     Probe {
@@ -172,6 +220,19 @@ async fn main() -> Result<()> {
             let o = replay::Options { from, to, equihash: !no_equihash, checkpoints: checkpoints.as_deref(), out: out.as_deref() };
             replay::run(&node::Node::new(&rpc), &net, o).await.map(|_| ())
         }
+        Cmd::Jobs { rpc, activation, from, to, shards, leaf_size, out } => {
+            let o = jobs::Options { activation, to, from, shards, leaf_size, out: &out };
+            jobs::make(&node::Node::new(&rpc), &net, o).await
+        }
+        Cmd::Publish { jobs, history, vks, registry, rings, groth16, out } => publish::run(publish::Options {
+            jobs: &jobs,
+            history: &history,
+            vks: vks.as_deref(),
+            registry: registry.as_deref(),
+            rings: &rings,
+            groth16: groth16.as_deref(),
+            out: &out,
+        }),
         Cmd::Probe { lwd, block } => {
             let mut c = lwd::connect(&lwd).await?;
             if let Some(h) = block {

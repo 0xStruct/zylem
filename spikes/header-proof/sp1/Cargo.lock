@@ -9288,6 +9288,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "zylem-aggregate"
+version = "0.0.1"
+dependencies = [
+ "sha2 0.10.8",
+ "sp1-zkvm",
+ "zylem-header",
+]
+
+[[package]]
 name = "zylem-core"
 version = "0.0.1"
 dependencies = [
@@ -9320,7 +9329,9 @@ dependencies = [
  "bincode",
  "hex",
  "rand 0.8.8",
+ "serde",
  "serde_json",
+ "sha2 0.10.8",
  "sp1-build",
  "sp1-sdk",
  "sp1-verifier",
@@ -9347,6 +9358,15 @@ dependencies = [
  "primitive-types",
  "serde",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "zylem-header-leaf"
+version = "0.0.1"
+dependencies = [
+ "sha2 0.10.8",
+ "sp1-zkvm",
+ "zylem-header",
 ]
 
 [[package]]

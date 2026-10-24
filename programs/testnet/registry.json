@@ -1,0 +1,50 @@
+{
+  "network": "Test",
+  "root": "77a707e3fd3eb5fa49dc8a20380ac7c86bf6044d783529772fff3292b8ce331d",
+  "entries": [
+    {
+      "action": "Allow",
+      "kind": "HeaderLeaf",
+      "net": "Test",
+      "era": 2,
+      "first": 4465026,
+      "last": 9007199254740991,
+      "key": [
+        724422817,
+        1002598560,
+        518399069,
+        1000027383,
+        1608796858,
+        830330243,
+        1444101781,
+        1229281858
+      ],
+      "sp1_version": "v6.1.0",
+      "artifact": "header-leaf-era2-a1d02d2ba070c23b.elf",
+      "artifact_sha256": "9cbb411fea46220b1d1f1c63de4553b4f6e900502998ccfb9ce90371ba5ac96f",
+      "note": "generation 1 header leaf, testnet NU7 onward"
+    },
+    {
+      "action": "Allow",
+      "kind": "Aggregate",
+      "net": "Test",
+      "era": 255,
+      "first": 0,
+      "last": 9007199254740991,
+      "key": [
+        246868960,
+        1265740514,
+        246486356,
+        1132674032,
+        464004725,
+        1662405160,
+        812453963,
+        1020186448
+      ],
+      "sp1_version": "v6.1.0",
+      "artifact": "aggregate-e0ebb60ee2aa714b.elf",
+      "artifact_sha256": "c115790de444250c3137fe0330c119057ef2075478045c249f2327063c40e620",
+      "note": "generation 1 aggregation"
+    }
+  ]
+}
