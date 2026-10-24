@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-zylem-hdr = { path = "../core" }
+zylem-hdr = { package = "zylem-header", path = "../../../crates/zylem-header" }
 zylem-core = { path = "../../../crates/zylem-core" }
 serde_json = "1"
 anyhow = "1"

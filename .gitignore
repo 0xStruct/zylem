@@ -1,6 +1,7 @@
 /target/
 /data/
 /spikes/**/target/
+/testing/**/target/
 # Built on a GPU machine; reused through data/gpu-bench/, never committed.
 /spikes/header-proof/gpu-bench/prebuilt/
 /spikes/header-proof/gpu-bench/*.tar.gz

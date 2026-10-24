@@ -1,6 +1,6 @@
 [package]
 name = "zylem-core"
-description = "Verifies Zcash light-wallet data against block headers: proof of work, transaction IDs, Merkle roots and note commitment trees"
+description = "Verifies Zcash light-wallet data against block headers: proof of work, the difficulty rule, transaction IDs, Merkle roots and note commitment trees"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 zylem-proto.workspace = true
+zylem-header.workspace = true
 zcash_primitives.workspace = true
 zcash_protocol.workspace = true
 zcash_encoding.workspace = true

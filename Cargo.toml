@@ -2,12 +2,13 @@
 resolver = "2"
 members = [
     "crates/zylem-proto",
+    "crates/zylem-header",
     "crates/zylem-core",
     "crates/zylem-build",
     "crates/zylem-proxy",
 ]
-# Spikes have their own workspaces and toolchains.
-exclude = ["spikes"]
+# Spikes and differential tests have their own workspaces.
+exclude = ["spikes", "testing"]
 
 [workspace.package]
 version = "0.0.1"
@@ -18,6 +19,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 zylem-proto = { path = "crates/zylem-proto" }
 zylem-core = { path = "crates/zylem-core" }
+zylem-header = { path = "crates/zylem-header" }
 
 # Zcash stack, pinned to the NU7 / Ironwood pre-releases that zcash-devtool builds against.
 zcash_primitives = { version = "=0.31.0-pre.2", default-features = false }

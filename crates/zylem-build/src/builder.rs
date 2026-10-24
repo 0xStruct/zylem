@@ -7,7 +7,7 @@ use anyhow::{bail, Context, Result};
 use zcash_protocol::consensus::Network;
 use zylem_core::{
     block::{self, PoolTxCounts},
-    header::Header,
+    header::{DifficultyContext, Header},
     history::{self, HistoryTree, LeafParts},
     manifest::{display_hash, Manifest, RingEntry},
     merkle,
@@ -24,6 +24,8 @@ pub struct State {
     pub trees: Trees,
     pub history: HistoryTree,
     pub last_header: Option<Header>,
+    /// Difficulty context up to `last_header`, for the self-check.
+    pub context: DifficultyContext,
 }
 
 pub struct Builder {
@@ -109,7 +111,7 @@ impl Builder {
             bail!("bootstrap trees differ from the node's tree state at {to}");
         }
         eprintln!("bootstrap: history tree and trees match header {} and the node", to + 1);
-        Ok(State { height: to, trees, history, last_header: last })
+        Ok(State { height: to, trees, history, last_header: last, context: DifficultyContext::default() })
     }
 
     /// Builds the Ring for `[start, end]` on top of `state`, advancing it. A sealed Ring
@@ -212,6 +214,7 @@ impl Builder {
             trees: v.trees_after.last().unwrap().clone(),
             last_header: Some(v.last_header().clone()),
             history: v.history,
+            context: v.context_after,
         }))
     }
 
@@ -249,10 +252,11 @@ impl Builder {
             }
             let prev_header = state.last_header.clone();
             let prev_trees = state.trees.clone();
+            let prev_context = state.context.clone();
             let ring = self.build(&mut state, start, end, true).await?;
             // A builder never publishes a Ring that fails verification.
-            let prev = prev_header.as_ref().map(|h| Continuation { last_header: h, trees: &prev_trees });
-            ring::verify(&self.network, &ring, prev).context("self-check")?;
+            let prev = prev_header.as_ref().map(|h| Continuation { last_header: h, trees: &prev_trees, context: &prev_context });
+            state.context = ring::verify(&self.network, &ring, prev).context("self-check")?.context_after;
             let entry = self.write_ring(&ring, "ring")?;
             eprintln!("ring {start}..={end}: {} bytes, verified", entry.size);
             m.rings.push(entry);
@@ -265,8 +269,9 @@ impl Builder {
         if start <= tip && max_rings.is_none() {
             let prev_header = state.last_header.clone();
             let prev_trees = state.trees.clone();
+            let prev_context = state.context.clone();
             let ring = self.build(&mut state, start, tip, false).await?;
-            let prev = prev_header.as_ref().map(|h| Continuation { last_header: h, trees: &prev_trees });
+            let prev = prev_header.as_ref().map(|h| Continuation { last_header: h, trees: &prev_trees, context: &prev_context });
             ring::verify(&self.network, &ring, prev).context("tail self-check")?;
             let entry = self.write_ring(&ring, "tail")?;
             m.tail = Some(entry);
@@ -279,10 +284,12 @@ impl Builder {
 }
 
 /// Verifies every Ring in a directory's manifest, in order, as a client would.
-pub fn verify_dir(dir: &Path, network: &Network) -> Result<()> {
+pub fn verify_dir(dir: &Path, network: &Network, txids: Option<&Path>) -> Result<()> {
     let m = read_manifest(dir)?.context("no manifest")?;
+    let mut txids = txids.map(|p| std::fs::File::create(p).map(std::io::BufWriter::new)).transpose()?;
     let started = std::time::Instant::now();
-    let mut prev: Option<(Header, Trees)> = None;
+    let mut prev: Option<(Header, Trees, DifficultyContext)> = None;
+    let mut checked_from = None;
     let (mut blocks, mut txs) = (0u64, 0u64);
     for entry in m.rings.iter().chain(m.tail.iter()) {
         let bytes = std::fs::read(dir.join(&entry.file))?;
@@ -290,19 +297,33 @@ pub fn verify_dir(dir: &Path, network: &Network) -> Result<()> {
             bail!("{}: file hash differs from the manifest", entry.file);
         }
         let ring = ring::decode_file(&bytes)?;
-        let cont = prev.as_ref().map(|(h, t)| Continuation { last_header: h, trees: t });
+        let cont = prev.as_ref().map(|(h, t, c)| Continuation { last_header: h, trees: t, context: c });
         let v = ring::verify(network, &ring, cont).with_context(|| entry.file.clone())?;
+        checked_from = match (checked_from, v.context_checked_from) {
+            (Some(from), Some(f)) if f == v.start_height => Some(from),
+            (_, f) => f,
+        };
+        if let Some(f) = txids.as_mut() {
+            use std::io::Write;
+            for (b, rb) in v.blocks.iter().zip(&ring.blocks) {
+                // Auth data root in internal byte order; hashes in display order.
+                let ids: Vec<String> = b.txids.iter().map(display_hash).collect();
+                let line = [b.header.height.to_string(), display_hash(&b.header.hash), hex::encode(&rb.auth_data_root), ids.join(",")];
+                writeln!(f, "{}", line.join(" "))?;
+            }
+        }
         blocks += v.blocks.len() as u64;
         txs += v.blocks.iter().map(|b| b.txids.len() as u64).sum::<u64>();
         println!(
             "  {} {}..={}: ok (roots authenticated to {})",
             entry.file, v.start_height, v.end_height(), v.authenticated_to
         );
-        prev = Some((v.last_header().clone(), v.trees_after.last().unwrap().clone()));
+        prev = Some((v.last_header().clone(), v.trees_after.last().unwrap().clone(), v.context_after));
     }
     println!(
-        "verified {blocks} blocks, {txs} transactions in {:.1} s",
-        started.elapsed().as_secs_f64()
+        "verified {blocks} blocks, {txs} transactions in {:.1} s; difficulty and time rules checked from height {}",
+        started.elapsed().as_secs_f64(),
+        checked_from.map_or("none".into(), |h| h.to_string())
     );
     Ok(())
 }

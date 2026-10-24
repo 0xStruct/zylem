@@ -10,6 +10,8 @@ pub enum Reject {
     PowInvalid { height: u64 },
     #[error("block hash above its own target at height {height}")]
     TargetNotMet { height: u64 },
+    #[error("header at height {height} breaks the difficulty or time rules: {detail}")]
+    ContextInvalid { height: u64, detail: String },
     #[error("header at height {height} does not link to its predecessor")]
     BrokenChain { height: u64 },
     #[error("block {height} does not match the checkpoint")]

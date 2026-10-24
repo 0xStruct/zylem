@@ -7,8 +7,11 @@ RISC Zero 3.0.6 and measures the cost. Run on 2026-10-21 on an Apple M2 Pro (10 
 
 ## What the guest proves
 
-For each header (`core/src/lib.rs`, shared by the guest and the native validator):
+For each header (`crates/zylem-header`, formerly this spike's `core/`, shared by the
+guests, the native validator and `zylem-core`):
 
+- it is 1,487 bytes with the solution length encoded as `fd 40 05` (added after the
+  Zakura differential tests, see `docs/phase3.md`);
 - it links to the previous header (`hashPrevBlock`);
 - its double-SHA-256 hash meets its own target, which is no easier than PoWLimit;
 - its `nBits` equals the difficulty adjustment rule's result, copied from Zakura's
@@ -98,7 +101,7 @@ cargo run --release -p zylem-hdr-host -- ../../data/testnet --prove 100
 
 ## SP1 comparison
 
-`sp1/` runs the same rules crate (`core/`) in SP1 6.9.0, on the same 100 testnet
+`sp1/` runs the same rules crate (`crates/zylem-header`) in SP1 6.9.0, on the same 100 testnet
 headers from height 4,494,811, with SP1's patched SHA-256. Its output equals the native
 run's for every batch. Measured on the same M2 Pro, CPU only:
 
@@ -143,7 +146,7 @@ previous link's published state (empty for the first link) and a segment of head
 verifies the previous link's compressed proof inside the zkVM with `verify_sp1_proof`,
 which binds that proof to this program's key and to exactly those state bytes, checks
 the new headers continue from that state (last hash, next height, difficulty context),
-proves them, and publishes the extended 245-byte state (`ChainState` in `core/`): key
+proves them, and publishes the extended 245-byte state (`ChainState` in `zylem-header`): key
 digest, checkpoint, last height and hash, total work, end context, a hash chained over
 every segment's records, and the segment count. A client accepts the newest proof if it
 verifies, its key digest is the program the client trusts, and its checkpoint is a block
@@ -186,7 +189,7 @@ cargo run --release -p zylem-hdr-sp1 --bin chain -- ../../../data/testnet --brok
 For the history backfill, segments are proved independently and joined in a tree
 instead of one long sequential chain.
 
-- `sp1/leaf` proves one segment of headers and publishes a `RangeClaim` (`core/`, 245
+- `sp1/leaf` proves one segment of headers and publishes a `RangeClaim` (`zylem-header`, 245
   bytes plus 41 per records peak): first height, anchor hash and start difficulty
   context; last height, last hash and end context; total work; the number of leaves;
   whether Equihash was checked; and the records commitment.
@@ -263,7 +266,7 @@ each leaf's records in order and joined leaves as SHA-256(0x01 ‖ left ‖ righ
 root depended on where provers split the range, and a record carried no height. A
 client could not recompute it from a Ring.
 
-The records commitment (`Peaks` in `core/`) is now fixed by the heights alone:
+The records commitment (`Peaks` in `zylem-header`) is now fixed by the heights alone:
 
 - every height has one place in a binary tree over all heights; a record's leaf is
   SHA-256(0x00 ‖ height ‖ record) and an inner node SHA-256(0x01 ‖ left ‖ right);
@@ -297,7 +300,7 @@ Checks in `aggregate` against the real headers of the two leaves (heights 4,494,
 | Every header one height off | `Mismatch` |
 | Headers after the proven range | `OutOfRange` |
 
-Native unit tests (`cargo test -p zylem-hdr`) cover splits at six points and a
+Native unit tests (`cargo test -p zylem-header` at the repo root) cover splits at six points and a
 three-leaf tree joined both ways, equal records at two heights giving different roots, a
 tampered record, swapped records, shifted heights, ranges outside the claim, a forged
 sibling, a short path, claim encoding, and a child whose blocks were never merged.

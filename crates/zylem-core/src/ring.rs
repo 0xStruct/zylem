@@ -8,7 +8,7 @@ use zylem_proto::ring::{Ring, RingBlock};
 
 use crate::{
     block::{self, VerifiedBlock},
-    header::Header,
+    header::{DifficultyContext, Header},
     history::{HistoryTree, LeafParts},
     merkle,
     tree::{CompletedSubtree, Roots, Trees},
@@ -53,6 +53,9 @@ pub fn file_hash(bytes: &[u8]) -> [u8; 32] {
 pub struct Continuation<'a> {
     pub last_header: &'a Header,
     pub trees: &'a Trees,
+    /// `(bits, time)` of the headers up to and including `last_header`, oldest first, for
+    /// the difficulty and time rules. Shorter than needed only near the trust anchor.
+    pub context: &'a DifficultyContext,
 }
 
 /// A Ring whose every block passed.
@@ -69,6 +72,11 @@ pub struct VerifiedRing {
     pub subtrees: Vec<CompletedSubtree>,
     pub history: HistoryTree,
     pub work: U256,
+    /// Context after the Ring's last block, for the next Ring.
+    pub context_after: DifficultyContext,
+    /// First height whose difficulty and time rules were checked: every later header in
+    /// the Ring was. `None` if the context never became long enough.
+    pub context_checked_from: Option<u64>,
 }
 
 impl VerifiedRing {
@@ -93,8 +101,11 @@ fn claimed_roots(rb: &RingBlock, height: u64) -> Result<Roots, Reject> {
 
 /// Checks a whole Ring:
 ///
-/// 1. every header has valid Equihash, meets its own target, and links to the one before
-///    (and to `prev`, the previous Ring's last header, when given);
+/// 1. every header has valid Equihash, meets its own target, links to the one before
+///    (and to `prev`, the previous Ring's last header, when given), and follows the
+///    difficulty adjustment and time rules once enough predecessors are known (from
+///    `prev`'s context, else from the Ring itself after its first 28 or, from NU7, 113
+///    blocks);
 /// 2. every block's transaction IDs are rebuilt from compact data and aux, and match the
 ///    header's Merkle root;
 /// 3. the history tree, restored from the Ring's start peaks and extended with each block's
@@ -143,6 +154,8 @@ pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Res
     let mut subtrees = vec![];
     let mut claimed = Vec::with_capacity(ring.blocks.len());
     let mut work = U256::zero();
+    let mut context = prev.as_ref().map(|p| p.context.clone()).unwrap_or_default();
+    let mut context_checked_from = None;
 
     for (i, rb) in ring.blocks.iter().enumerate() {
         let height = first + i as u64;
@@ -151,6 +164,13 @@ pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Res
             if header.prev_hash != p {
                 return Err(Reject::BrokenChain { height });
             }
+        }
+        // The context needed grows at NU7 (17 to 102 blocks), so a Ring without a prior
+        // context can stop being checkable for a while; only an unbroken run counts.
+        if context.check_and_push(network, &header)? {
+            context_checked_from.get_or_insert(height);
+        } else {
+            context_checked_from = None;
         }
         // This header commits to the history of every earlier block in the epoch.
         let auth: [u8; 32] = rb.auth_data_root[..]
@@ -186,6 +206,7 @@ pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Res
         if Some(next.prev_hash) != prev_hash {
             return Err(Reject::BrokenChain { height });
         }
+        context.clone().check_and_push(network, &next)?;
         let auth: [u8; 32] = ring.next_auth_data_root[..]
             .try_into()
             .map_err(|_| Reject::malformed("auth data root", height))?;
@@ -223,5 +244,7 @@ pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Res
         subtrees,
         history,
         work,
+        context_after: context,
+        context_checked_from,
     })
 }

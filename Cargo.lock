@@ -3221,6 +3221,7 @@ dependencies = [
  "hex",
  "incrementalmerkletree",
  "orchard",
+ "primitive-types",
  "prost",
  "reqwest",
  "serde",
@@ -3233,6 +3234,7 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zylem-core",
+ "zylem-header",
  "zylem-proto",
 ]
 
@@ -3257,7 +3259,18 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zstd",
+ "zylem-header",
  "zylem-proto",
+]
+
+[[package]]
+name = "zylem-header"
+version = "0.0.1"
+dependencies = [
+ "equihash",
+ "primitive-types",
+ "serde",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -3290,5 +3303,6 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zylem-core",
+ "zylem-header",
  "zylem-proto",
 ]

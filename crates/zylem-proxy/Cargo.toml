@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 zylem-proto.workspace = true
 zylem-core.workspace = true
+zylem-header.workspace = true
 zcash_primitives.workspace = true
 zcash_protocol.workspace = true
 prost.workspace = true

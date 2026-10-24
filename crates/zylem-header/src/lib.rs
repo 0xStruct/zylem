@@ -1,4 +1,4 @@
-//! Zcash header-chain rules, shared by the RISC Zero guest and the native host.
+//! Zcash header-chain rules, shared by zylem-core and the zkVM programs that prove them.
 //!
 //! For each header: Equihash (optional, it dominates the cost), the link to the previous
 //! header, the hash meeting the header's own target, the difficulty adjustment rule
@@ -16,6 +16,8 @@ use sha2::{Digest, Sha256};
 
 pub const HEADER_SIZE: usize = 1_487;
 const EQUIHASH_INPUT: usize = 108;
+/// The solution's length, 1,344, as a compact size: the only encoding consensus accepts.
+const SOLUTION_LENGTH: [u8; 3] = [0xfd, 0x40, 0x05];
 /// hash, Merkle root, block commitments (32 B each), time, bits (4 B each).
 pub const RECORD_SIZE: usize = 104;
 pub const MEDIAN_SPAN: usize = 11;
@@ -75,9 +77,11 @@ impl Net {
             Net::Test => Some(self.spacing(h) * if self.nu7_active(h) { 18 } else { 6 }),
         }
     }
+    /// The 90-minutes-after-median-time rule: from height 2 on mainnet (Zakura's
+    /// `validate_contextual_difficulty_and_time`), from 653,606 on testnet.
     fn max_time_enforced(self, h: u64) -> bool {
         match self {
-            Net::Main => true,
+            Net::Main => h >= 2,
             Net::Test => h >= 653_606,
         }
     }
@@ -94,6 +98,7 @@ impl Net {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Fail {
+    /// Not 1,487 bytes, or the solution length is not encoded as `fd 40 05`.
     Size,
     BrokenLink,
     Equihash,
@@ -250,9 +255,7 @@ pub fn check(
     prev: &[(u32, u32)],
     check_equihash: bool,
 ) -> Result<Checked, Fail> {
-    if header.len() != HEADER_SIZE {
-        return Err(Fail::Size);
-    }
+    check_encoding(header)?;
     if &header[4..36] != prev_hash {
         return Err(Fail::BrokenLink);
     }
@@ -260,10 +263,7 @@ pub fn check(
     let bits = u32::from_le_bytes(header[104..108].try_into().unwrap());
 
     if check_equihash {
-        let nonce = &header[EQUIHASH_INPUT..EQUIHASH_INPUT + 32];
-        let solution = &header[EQUIHASH_INPUT + 35..];
-        equihash::is_valid_solution(200, 9, &header[..EQUIHASH_INPUT], nonce, solution)
-            .map_err(|_| Fail::Equihash)?;
+        check_equihash_solution(header)?;
     }
 
     let hash = sha256d(header);
@@ -272,11 +272,18 @@ pub fn check(
         return Err(Fail::AboveTarget);
     }
 
+    check_contextual(net, height, time, bits, prev)?;
+    Ok(Checked { hash, bits, time, work: work(target), record: record_of(header, &hash) })
+}
+
+/// The rules that depend on a header's predecessors (`prev`, `(bits, time)` newest
+/// first): `nBits` is the difficulty adjustment rule's result, and the time is after the
+/// median of the previous 11 and, where enforced, at most 90 minutes past it.
+pub fn check_contextual(net: Net, height: u64, time: u32, bits: u32, prev: &[(u32, u32)]) -> Result<(), Fail> {
     let expected = expected_bits(net, height, time, prev)?;
     if expected != bits {
         return Err(Fail::WrongDifficulty { expected, actual: bits });
     }
-
     let mut mtp: Vec<u32> = prev.iter().take(MEDIAN_SPAN).map(|p| p.1).collect();
     let mtp = median(&mut mtp);
     if (time as i64) <= mtp {
@@ -285,8 +292,30 @@ pub fn check(
     if net.max_time_enforced(height) && time as i64 > mtp + MAX_TIME_SINCE_MEDIAN {
         return Err(Fail::TimeTooLate);
     }
+    Ok(())
+}
 
-    Ok(Checked { hash, bits, time, work: work(target), record: record_of(header, &hash) })
+/// How many predecessors `check_contextual` needs at `height`.
+pub fn context_needed(net: Net, height: u64) -> usize {
+    (net.window(height) + MEDIAN_SPAN).min(height as usize)
+}
+
+/// A header is 1,487 bytes with the solution length encoded as consensus requires. The
+/// length bytes are hashed into the block hash but not into Equihash's input, so without
+/// this check a prover could solve Equihash once and then grind them to meet the target.
+pub fn check_encoding(header: &[u8]) -> Result<(), Fail> {
+    if header.len() != HEADER_SIZE || header[EQUIHASH_INPUT + 32..EQUIHASH_INPUT + 35] != SOLUTION_LENGTH {
+        return Err(Fail::Size);
+    }
+    Ok(())
+}
+
+/// Equihash (200, 9) over a 1,487-byte header: the solution after the 3-byte length.
+pub fn check_equihash_solution(header: &[u8]) -> Result<(), Fail> {
+    check_encoding(header)?;
+    let nonce = &header[EQUIHASH_INPUT..EQUIHASH_INPUT + 32];
+    let solution = &header[EQUIHASH_INPUT + 35..];
+    equihash::is_valid_solution(200, 9, &header[..EQUIHASH_INPUT], nonce, solution).map_err(|_| Fail::Equihash)
 }
 
 /// A header's record: what a client keeps of it once the header chain is proven.
@@ -622,6 +651,21 @@ mod tests {
         }
         let wide = U512::from(x) * U512::from(97u64);
         assert_eq!(div_small_512(wide, 97), x);
+    }
+
+    #[test]
+    fn solution_length_must_be_canonical() {
+        let mut header = [0u8; HEADER_SIZE];
+        header[140..143].copy_from_slice(&SOLUTION_LENGTH);
+        assert_eq!(check_encoding(&header), Ok(()));
+        // Other encodings of 1,344, or other lengths, change the block hash without
+        // changing Equihash's input.
+        for bad in [[0xfe, 0x40, 0x05], [0xfd, 0x40, 0x06], [0xfd, 0x41, 0x05]] {
+            header[140..143].copy_from_slice(&bad);
+            assert_eq!(check_encoding(&header), Err(Fail::Size));
+            assert_eq!(check_equihash_solution(&header), Err(Fail::Size));
+        }
+        assert_eq!(check_encoding(&header[..HEADER_SIZE - 1]), Err(Fail::Size));
     }
 
     fn records(n: usize, seed: u8) -> Vec<[u8; RECORD_SIZE]> {

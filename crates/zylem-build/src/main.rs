@@ -4,6 +4,7 @@ mod builder;
 mod lwd;
 mod lwdcheck;
 mod node;
+mod replay;
 mod serve;
 mod spike;
 mod tamper;
@@ -104,6 +105,31 @@ enum Cmd {
     /// Verify every Ring in a directory, as a client would.
     Verify {
         dir: std::path::PathBuf,
+        /// Also write each block's height, hash and rebuilt transaction IDs (display hex)
+        /// and its auth data root (internal order) here, one block per line, for
+        /// differential tests.
+        #[arg(long)]
+        txids: Option<std::path::PathBuf>,
+    },
+    /// Replay a node's header chain through the header rules (links, Equihash, target,
+    /// difficulty adjustment, time), streaming, without storing headers.
+    ReplayHeaders {
+        #[arg(long)]
+        rpc: String,
+        /// First height whose rules are checked; its predecessors provide the context.
+        #[arg(long)]
+        from: u64,
+        /// Last height (default: the node's tip).
+        #[arg(long)]
+        to: Option<u64>,
+        #[arg(long)]
+        no_equihash: bool,
+        /// Checkpoint list to compare block hashes against (`height hash` per line).
+        #[arg(long)]
+        checkpoints: Option<std::path::PathBuf>,
+        /// Write each header's bits, time and hash here, for differential tests.
+        #[arg(long)]
+        out: Option<std::path::PathBuf>,
     },
 }
 
@@ -119,12 +145,16 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let net = network(&cli.network);
     match cli.cmd {
+        Cmd::ReplayHeaders { rpc, from, to, no_equihash, checkpoints, out } => {
+            let o = replay::Options { from, to, equihash: !no_equihash, checkpoints: checkpoints.as_deref(), out: out.as_deref() };
+            replay::run(&node::Node::new(&rpc), &net, o).await
+        }
         Cmd::Spike { rpc, from, count } => spike::run(&node::Node::new(&rpc), net, from, count).await,
         Cmd::Backfill { rpc, lwd, out, epoch_length, finality, max_rings } => {
             let b = builder::Builder { node: node::Node::new(&rpc), network: net, out, epoch_length, finality };
             b.step(lwd.as_deref(), max_rings).await.map(|_| ())
         }
-        Cmd::Verify { dir } => builder::verify_dir(&dir, &net),
+        Cmd::Verify { dir, txids } => builder::verify_dir(&dir, &net, txids.as_deref()),
         Cmd::Slice { dir, from, to, out } => builder::slice_dir(&dir, &net, from, to, &out),
         Cmd::Serve { out, listen, rpc, epoch_length, finality, interval } => {
             let b = rpc.map(|r| builder::Builder { node: node::Node::new(&r), network: net, out: out.clone(), epoch_length, finality });

@@ -4984,17 +4984,8 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zstd",
+ "zylem-header",
  "zylem-proto",
-]
-
-[[package]]
-name = "zylem-hdr"
-version = "0.0.1"
-dependencies = [
- "equihash",
- "primitive-types",
- "serde",
- "sha2 0.10.8",
 ]
 
 [[package]]
@@ -5004,9 +4995,9 @@ dependencies = [
  "anyhow",
  "hex",
  "risc0-zkvm",
- "zylem-hdr",
  "zylem-hdr-methods",
  "zylem-hdr-validate",
+ "zylem-header",
 ]
 
 [[package]]
@@ -5023,7 +5014,17 @@ dependencies = [
  "anyhow",
  "serde_json",
  "zylem-core",
- "zylem-hdr",
+ "zylem-header",
+]
+
+[[package]]
+name = "zylem-header"
+version = "0.0.1"
+dependencies = [
+ "equihash",
+ "primitive-types",
+ "serde",
+ "sha2 0.10.8",
 ]
 
 [[package]]

@@ -1,7 +1,11 @@
-//! Block headers: parsing, Equihash, the header's own target, and chain work.
+//! Block headers: parsing, Equihash, the header's own target, chain work, and the rules
+//! that depend on earlier headers (difficulty adjustment, median time past), which come
+//! from `zylem-header` so the native verifier and the zkVM programs share one copy.
 
 use primitive_types::U256;
 use zcash_primitives::block::BlockHeader;
+use zcash_protocol::consensus::Network;
+use zylem_header::{Net, MAX_CONTEXT};
 
 use crate::Reject;
 
@@ -45,7 +49,7 @@ impl Header {
     }
 
     /// Parses a header and checks its Equihash solution and that its hash meets the
-    /// target it declares. It does not check the difficulty adjustment rule.
+    /// target it declares. The difficulty adjustment rule is `DifficultyContext::check_and_push`.
     pub fn parse_and_check(height: u64, bytes: &[u8]) -> Result<Self, Reject> {
         let header = Self::parse_unchecked(height, bytes)?;
         let nonce = &bytes[EQUIHASH_INPUT..EQUIHASH_INPUT + 32];
@@ -62,36 +66,90 @@ impl Header {
     }
 }
 
-/// Expands compact `nBits` into a 256-bit target, rejecting negative, zero and
-/// overflowing encodings the way zcashd does.
-pub fn expand_bits(bits: u32) -> Option<U256> {
-    if bits & 0x0080_0000 != 0 {
-        return None;
-    }
-    let mantissa = bits & 0x007f_ffff;
-    let exponent = (bits >> 24) as i32 - 3;
-    let (mantissa, exponent) = match (mantissa, exponent) {
-        (_, e) if e >= 32 => return None,
-        (m, 31) if m > 0xff => return None,
-        (m, 31) => (m << 16, 29),
-        (m, 30) if m > 0xffff => return None,
-        (m, 30) => (m << 8, 29),
-        (m, e) if e < 0 => (m >> ((-e) * 8) as u32, 0),
-        (m, e) => (m, e),
-    };
-    let target = U256::from(mantissa) * U256::from(256).pow(U256::from(exponent));
-    (!target.is_zero()).then_some(target)
-}
-
-/// Work represented by a target: 2^256 / (target + 1).
-pub fn work_from_target(target: U256) -> U256 {
-    if target == U256::MAX {
-        return U256::one();
-    }
-    (!target / (target + 1)) + 1
-}
+pub use zylem_header::{expand as expand_bits, work as work_from_target};
 
 /// Work for a compact `nBits`, or zero if the encoding is invalid.
 pub fn work_from_bits(bits: u32) -> U256 {
     expand_bits(bits).map(work_from_target).unwrap_or_default()
+}
+
+fn net(network: &Network) -> Net {
+    match network {
+        Network::MainNetwork => Net::Main,
+        Network::TestNetwork => Net::Test,
+    }
+}
+
+/// The `(bits, time)` of the latest headers, oldest first, that the difficulty and time
+/// rules read. Once it holds enough predecessors for a height, every later header is
+/// checked against them.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DifficultyContext(pub Vec<(u32, u32)>);
+
+impl DifficultyContext {
+    /// Checks `header` against the context if it is long enough, then appends it.
+    /// Returns whether the header was checked.
+    pub fn check_and_push(&mut self, network: &Network, header: &Header) -> Result<bool, Reject> {
+        let n = net(network);
+        let checked = self.0.len() >= zylem_header::context_needed(n, header.height);
+        if checked {
+            let newest_first: Vec<(u32, u32)> = self.0.iter().rev().copied().collect();
+            zylem_header::check_contextual(n, header.height, header.time, header.bits, &newest_first)
+                .map_err(|f| Reject::ContextInvalid { height: header.height, detail: format!("{f:?}") })?;
+        }
+        self.0.push((header.bits, header.time));
+        if self.0.len() > MAX_CONTEXT {
+            self.0.remove(0);
+        }
+        Ok(checked)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header(height: u64, bits: u32, time: u32) -> Header {
+        Header {
+            height,
+            hash: [0; 32],
+            prev_hash: [0; 32],
+            merkle_root: [0; 32],
+            commitments: [0; 32],
+            time,
+            bits,
+            work: U256::zero(),
+        }
+    }
+
+    #[test]
+    fn difficulty_context_checks_once_long_enough() {
+        let net = Network::TestNetwork;
+        // 113 predecessors after NU7, 25 s apart, at one difficulty.
+        let h0 = 4_500_000u64;
+        let mut ctx = DifficultyContext::default();
+        for i in 0..MAX_CONTEXT as u64 {
+            let checked = ctx.check_and_push(&net, &header(h0 + i, 0x1d01_0000, 1_700_000_000 + 25 * i as u32)).unwrap();
+            assert!(!checked, "checked before the context was long enough");
+        }
+        let h = h0 + MAX_CONTEXT as u64;
+        let time = 1_700_000_000 + 25 * MAX_CONTEXT as u32;
+        let newest_first: Vec<(u32, u32)> = ctx.0.iter().rev().copied().collect();
+        let expected = zylem_header::expected_bits(Net::Test, h, time, &newest_first).unwrap();
+
+        assert!(matches!(
+            ctx.clone().check_and_push(&net, &header(h, expected ^ 1, time)),
+            Err(Reject::ContextInvalid { .. })
+        ));
+        let mtp = newest_first[5].1; // the median of the last 11 evenly spaced times
+        assert!(matches!(
+            ctx.clone().check_and_push(&net, &header(h, expected, mtp)),
+            Err(Reject::ContextInvalid { .. })
+        ));
+        assert!(matches!(
+            ctx.clone().check_and_push(&net, &header(h, expected, mtp + 5_401)),
+            Err(Reject::ContextInvalid { .. })
+        ));
+        assert_eq!(ctx.check_and_push(&net, &header(h, expected, time)), Ok(true));
+    }
 }

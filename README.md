@@ -26,13 +26,18 @@ run end to end on testnet (NU7, Ironwood):
   error; the wallet never sees them.
 - Two independent builds produce byte-identical Rings.
 
+Phase 3 so far: the difficulty and time rules are enforced natively; 1.55M real testnet
+headers from NU6 across NU7 pass them, and Zylem agrees with Zakura on 400,000 random
+contexts, Equihash, and 46,542 rebuilt transaction IDs ([docs/phase3.md](docs/phase3.md)).
+
 Numbers: [docs/phase0.md](docs/phase0.md). Demo: [docs/demo.md](docs/demo.md).
 
 ## Crates
 
 | Crate | What it does |
 |---|---|
-| `zylem-core` | Pure verification: headers (Equihash, target, chain work), transaction-ID rebuild for v4/v5/v6, Merkle roots (rejecting duplicate IDs), the history-tree replay, note commitment trees, Ring encoding and checks |
+| `zylem-header` | The header-chain rules (difficulty adjustment, median time, work, Equihash, header encoding) and the canonical records commitment, shared with the zkVM programs |
+| `zylem-core` | Pure verification: headers (Equihash, target, difficulty rule, chain work), transaction-ID rebuild for v4/v5/v6, Merkle roots (rejecting duplicate IDs), the history-tree replay, note commitment trees, Ring encoding and checks |
 | `zylem-proto` | The light-wallet protocol (with server stubs) and the Ring format, compiled without `protoc` |
 | `zylem-build` | Builds Rings from a pruned Zakura node, verifies them, serves them over HTTP; also the Phase 0 spikes and a `tamper` tool for demos |
 | `zylem-proxy` | A `CompactTxStreamer` server that serves only verified blocks, tree states and subtree roots, checks what it relays from an upstream server, and has an audit mode |
@@ -42,16 +47,25 @@ Numbers: [docs/phase0.md](docs/phase0.md). Demo: [docs/demo.md](docs/demo.md).
 The client trusts a checkpoint (a block hash it must find in the verified chain) and
 the cryptography. Ring hosts, mirrors and upstream servers are untrusted for integrity.
 
-Checked: proof of work and each header's own target; that every transaction ID in a
-block is rebuilt from the data served and produces the header's Merkle root; the
-history tree against every next header; the Ring's note commitments against the
-authenticated roots, which authenticates every tree state; subtree roots older than the
-first Ring against the verified frontier; full transactions fetched upstream against
-their block.
+Checked: proof of work (Equihash, each header's own target) and the rules that depend
+on earlier headers (the difficulty adjustment, median time past, at most 90 minutes past
+it) for every header after the checkpoint; that every transaction ID in a block is
+rebuilt from the data served and produces the header's Merkle root; the history tree
+against every next header; the Ring's note commitments against the authenticated roots,
+which authenticates every tree state; subtree roots older than the first Ring against
+the verified frontier; full transactions fetched upstream against their block.
 
-Not checked yet: the difficulty adjustment rule (an attacker who eclipses every source
-needs no hashpower until Phase 3), the mempool, and the completeness of transparent
-address lookups. Query privacy (OHTTP, YPIR) is v1 and later.
+Not checked yet: the tip. There is no minimum chain work, the tip comes from one set of
+Ring hosts compared with one upstream server by height, and a lagging tip only logs a
+warning. Because Zcash adjusts difficulty every block, a private fork can lower its
+difficulty quickly: an endless fake chain costs about 26 honest blocks of work before
+NU7 (about 145 with NU7's 102-block window), so the difficulty rule alone does not stop
+an attacker who eclipses every source. Also not checked: the mempool and the
+completeness of transparent address lookups (relayed upstream). Query privacy (OHTTP,
+YPIR) is v1 and later.
+
+Assumption tier today: SPV with the full header rules from a checkpoint, plus
+authenticated transactions and shielded state, minus tip policy.
 
 ## Quick start (testnet)
 

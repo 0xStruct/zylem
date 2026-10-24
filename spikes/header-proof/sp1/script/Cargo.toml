@@ -9,7 +9,7 @@ publish = false
 sp1-sdk = { version = "=6.9.0", features = ["blocking", "network"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 rand = "0.8"
-zylem-hdr = { path = "../../core" }
+zylem-hdr = { package = "zylem-header", path = "../../../../crates/zylem-header" }
 zylem-hdr-validate = { path = "../../validate" }
 anyhow = "1"
 serde_json = "1"

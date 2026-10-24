@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use anyhow::{bail, Context, Result};
 use zcash_protocol::consensus::Network;
 use zylem_core::{
-    header::Header,
+    header::{DifficultyContext, Header},
     manifest::{display_hash, Manifest, RingEntry},
     ring::{self, Continuation, VerifiedRing},
     tree::{CompletedSubtree, Pool, Trees},
@@ -55,6 +55,8 @@ pub struct Chain {
     /// Last block of the newest sealed Ring.
     sealed_end: u64,
     tail_hash: Option<String>,
+    /// First height from which every header's difficulty and time rules were checked.
+    pub context_checked_from: Option<u64>,
 }
 
 impl Chain {
@@ -74,6 +76,11 @@ impl Chain {
         if self.blocks.is_empty() {
             self.first = v.start_height;
             self.trees_before = Some(v.trees_before.clone());
+        }
+        // An unbroken run of checked headers, from the earliest point it started.
+        let continues = self.context_checked_from.is_some() && v.context_checked_from == Some(v.start_height);
+        if !continues {
+            self.context_checked_from = v.context_checked_from;
         }
         for st in v.subtrees {
             self.subtrees.entry(st.pool).or_default().push(st);
@@ -100,8 +107,11 @@ impl Chain {
         }
     }
 
-    fn continuation(&self) -> Option<(Header, Trees)> {
-        self.blocks.get(&self.sealed_end).map(|b| (b.header.clone(), b.trees_after.clone()))
+    fn continuation(&self) -> Option<(Header, Trees, DifficultyContext)> {
+        let last = self.blocks.get(&self.sealed_end)?;
+        let from = self.sealed_end.saturating_sub(zylem_header::MAX_CONTEXT as u64 - 1);
+        let context = DifficultyContext(self.blocks.range(from..=self.sealed_end).map(|(_, b)| (b.header.bits, b.header.time)).collect());
+        Some((last.header.clone(), last.trees_after.clone(), context))
     }
 }
 
@@ -146,7 +156,7 @@ pub async fn refresh(chain: &mut Chain, src: &RingSource, network: &Network, fro
         }
         let ring = src.ring(entry).await?;
         let cont = chain.continuation();
-        let v = ring::verify(network, &ring, cont.as_ref().map(|(h, t)| Continuation { last_header: h, trees: t }))
+        let v = ring::verify(network, &ring, cont.as_ref().map(|(h, t, c)| Continuation { last_header: h, trees: t, context: c }))
             .with_context(|| format!("Ring {}..={} rejected", entry.start_height, entry.end_height))?;
         chain.truncate(chain.sealed_end.max(v.start_height - 1));
         let end = v.end_height();
@@ -160,7 +170,7 @@ pub async fn refresh(chain: &mut Chain, src: &RingSource, network: &Network, fro
         if chain.tail_hash.as_deref() != Some(&tail.hash) && tail.start_height == chain.sealed_end + 1 {
             let ring = src.ring(tail).await?;
             let cont = chain.continuation();
-            let v = ring::verify(network, &ring, cont.as_ref().map(|(h, t)| Continuation { last_header: h, trees: t }))
+            let v = ring::verify(network, &ring, cont.as_ref().map(|(h, t, c)| Continuation { last_header: h, trees: t, context: c }))
                 .with_context(|| format!("tail {}..={} rejected", tail.start_height, tail.end_height))?;
             chain.truncate(chain.sealed_end);
             chain.add(v);
@@ -175,10 +185,20 @@ pub async fn refresh(chain: &mut Chain, src: &RingSource, network: &Network, fro
 }
 
 /// The chain must contain the checkpoint. Everything verified is hash-linked to it.
+/// Headers up to the checkpoint are authenticated by hash links back from it; every
+/// header after it must also have passed the difficulty and time rules.
 pub fn check_checkpoint(chain: &Chain, cp: &Checkpoint) -> Result<()> {
     match chain.get(cp.height) {
-        Some(b) if b.header.hash == cp.hash => Ok(()),
+        Some(b) if b.header.hash == cp.hash => {}
         Some(_) => bail!("checkpoint mismatch at {}", cp.height),
         None => bail!("checkpoint {} is outside the verified range", cp.height),
+    }
+    match chain.context_checked_from {
+        Some(from) if from <= cp.height + 1 => Ok(()),
+        Some(from) => bail!(
+            "difficulty rules are checked only from {from}, after the checkpoint {}; use a later checkpoint",
+            cp.height
+        ),
+        None => bail!("no header was checked against the difficulty rules"),
     }
 }
