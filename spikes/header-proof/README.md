@@ -347,3 +347,43 @@ server, and `run.sh` stops a leftover server if `gpu-bench` dies anyway. The fix
 been checked on CPU only; the next GPU run is its first test there.
 
 Results: `gpu-bench/results/NVIDIA-GeForce-RTX-5090-20261021T171749Z.{jsonl,log}`.
+
+## Which proof a client verifies
+
+SP1 6.9.0 produces three proofs a client can check: the compressed STARK the tree is
+built from, and two wrappings over BN254, PLONK and Groth16. `sp1/script/src/bin/wrap.rs`
+proves one aggregate of two 50-header leaves (heights 4,494,811 to 4,494,910, no
+Equihash) in each form and times verification with the SDK and with the standalone
+`sp1-verifier` crate; `wasm-verify/` compiles that crate to WebAssembly and
+`wasm-verify/bench.mjs` times it under Node 22. M2 Pro, 16 GB, CPU only, 2026-10-22.
+
+| | Compressed (STARK) | Groth16 | PLONK |
+|---|---|---|---|
+| Trusted setup | none | SP1's circuit-specific ceremony | universal |
+| Proof size | 1,272,546 B (804 KB with zstd) | 356 B | not measured |
+| Proving the aggregate on this laptop | 192 s | 2,293 s (gnark itself: 41 s solving, 72 s proving) | crashed after solving 27.6M constraints, most likely out of memory |
+| Native verify (`sp1-verifier`) | 63.5 ms | 200 ms | |
+| WebAssembly verify, speed build | **37.6 ms** | 460 ms | |
+| WebAssembly verify, size build | 110 ms | 580 ms | |
+| WebAssembly module (verifier only) | 861 KB, 296 KB gzipped (with the BN254 verifiers) | 320 KB, 103 KB gzipped | same module as Groth16 |
+| Claim altered after proving | rejected | rejected | |
+| Another program's key | | rejected | |
+
+The public values (the `RangeClaim`) are 615 bytes and travel with every proof.
+
+Findings:
+
+- **The compressed STARK suits wallets best.** It needs no trusted setup, the
+  standalone verifier accepts our aggregate (its single-shard limitation does not apply),
+  and it verifies in tens of milliseconds in WebAssembly. A wallet downloads about 0.8 MB
+  per history-proof update.
+- **Groth16 is for chains, not wallets.** `sp1-verifier`'s BN254 pairing in plain Rust is
+  slow off-chain (200 ms native, 460 ms in WebAssembly, against 37.6 ms for the STARK).
+  Its value is the 356-byte proof and cheap on-chain verification.
+- **Wrapping needs a larger machine than a 16 GB laptop.** Groth16 took 38 minutes and
+  left the machine with almost no free memory (about 50 MB at the lowest); PLONK's
+  circuit is 1.7 times larger and did not finish. The circuit files are 2.7 GB (PLONK) plus
+  Groth16's. Wrapping belongs on the GPU prover (`groth16-cuda`), once per published
+  history proof.
+- Building with gnark natively (`--features native-gnark`) needs Go and `PROTOC`; the
+  default path runs gnark in Docker, which Docker Desktop limits to 8 GB here.

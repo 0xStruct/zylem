@@ -136,6 +136,9 @@ enum Cmd {
     Probe {
         #[arg(long)]
         lwd: String,
+        /// Also fetch this block and report whether the server includes the full header.
+        #[arg(long)]
+        block: Option<u64>,
     },
     /// Make a checkpoint with its minimum chain work: replays every header from the
     /// checkpoint to the release height and sums their work.
@@ -169,8 +172,12 @@ async fn main() -> Result<()> {
             let o = replay::Options { from, to, equihash: !no_equihash, checkpoints: checkpoints.as_deref(), out: out.as_deref() };
             replay::run(&node::Node::new(&rpc), &net, o).await.map(|_| ())
         }
-        Cmd::Probe { lwd } => {
+        Cmd::Probe { lwd, block } => {
             let mut c = lwd::connect(&lwd).await?;
+            if let Some(h) = block {
+                let b = lwd::blocks(&mut c, h, h).await?.remove(0);
+                println!("block {h}: header field {} bytes, {} transactions", b.header.len(), b.vtx.len());
+            }
             let info = c.get_lightd_info(zylem_proto::rpc::Empty {}).await?.into_inner();
             println!("vendor: {}", info.vendor);
             match c.get_latest_block(zylem_proto::rpc::ChainSpec {}).await {

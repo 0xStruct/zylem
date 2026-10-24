@@ -1,0 +1,26 @@
+[package]
+name = "zylem-wasm-verify"
+description = "Measures SP1 proof verification in WebAssembly, as a browser or mobile wallet would run it"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sp1-verifier = { version = "=6.9.0", default-features = false }
+wasm-bindgen = "0.2"
+bincode = { version = "1.3", optional = true }
+# A transitive dependency of the STARK verifier needs a randomness source on wasm32.
+getrandom = { version = "0.2", features = ["js"], optional = true }
+
+[features]
+# The STARK verifier too (no trusted setup, 1.27 MB proofs).
+compressed = ["sp1-verifier/full", "dep:bincode", "dep:getrandom"]
+
+[profile.release]
+opt-level = 3
+lto = true
