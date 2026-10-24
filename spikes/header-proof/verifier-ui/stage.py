@@ -3,8 +3,9 @@ binary files become base64 `.b64.txt`, and history.json points at them.
 
 Usage: python3 stage.py PUBLISH_DIR PKG_DIR OUT_DIR [PINNED_ROOT...]
 
-For a generation 1 publish the page pins the given registry roots, by default the root
-of the published registry.json.
+For a generation 1 publish the page pins the registry roots given here, which must come
+from the operator (programs/<network>/registry.json in the repository), never from the
+publish directory: a root the publisher states would let it authorize its own programs.
 """
 import base64, json, os, shutil, sys
 
@@ -33,7 +34,8 @@ for b in h["bindings"]:
     shutil.copy(os.path.join(pub, b["binding"]), os.path.join(out, "data", b["binding"]))
 if h.get("generation") == 1:
     shutil.copy(os.path.join(pub, h["programs"]["registry"]), os.path.join(out, "data", h["programs"]["registry"]))
-    pins = pins or [h["programs"]["root"]]
+    if not pins:
+        sys.exit("a generation 1 publish needs the registry roots to pin, given explicitly")
 page = open(os.path.join(os.path.dirname(__file__), "index.html")).read()
 page = page.replace("/*PINNED_ROOTS*/", ", ".join(json.dumps(p) for p in pins))
 open(os.path.join(out, "index.html"), "w").write(page)

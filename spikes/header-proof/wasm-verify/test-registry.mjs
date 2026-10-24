@@ -51,6 +51,18 @@ const grown = JSON.parse(registry);
 grown.entries.push({ ...grown.entries[0], era: 1, first: 584000, last: 4465025 });
 const grownJson = JSON.stringify(grown);
 expect("registry grown by an allow", () => verify_history_v2(proof, pv, grownJson, JSON.stringify([registry_root(grownJson)]), trusted), real ? "ok" : "ProofRejected");
+// The same entries in another order: a different registry that still allows every key,
+// so the proof's registry is not one of its earlier versions.
+const foreign = JSON.parse(registry);
+foreign.entries.reverse();
+const foreignJson = JSON.stringify(foreign);
+expect("claim made under a different registry", () => verify_history_v2(proof, pv, foreignJson, JSON.stringify([registry_root(foreignJson)]), trusted), "UnknownRegistry");
+// Re-allowing a revoked aggregation key does not restore it.
+const reallowed = JSON.parse(registry);
+const agg = reallowed.entries.find((e) => e.kind === "Aggregate");
+reallowed.entries.push({ ...agg, action: "Revoke", era: 255, first: 0 }, { ...agg });
+const reallowedJson = JSON.stringify(reallowed);
+expect("aggregation key revoked then allowed again", () => verify_history_v2(proof, pv, reallowedJson, JSON.stringify([registry_root(reallowedJson)]), trusted), "WrongAggregationProgram");
 if (revokedPath) {
   const revoked = readFileSync(revokedPath, "utf8");
   const revokedRoot = JSON.parse(revoked).root;

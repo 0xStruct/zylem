@@ -621,4 +621,35 @@ mod tests {
         let (l, r) = (leaf(ERA2, 512), leaf(ERA2 + 513, 512));
         assert!(matches!(Claim::join((&l, &LEAF_A), (&r, &LEAF_A), &reg, &AGG), Err(Refused::Range(_))));
     }
+
+    #[test]
+    fn one_leaf_without_equihash_marks_every_aggregate_above_it() {
+        let reg = base();
+        let mut skipped = leaf(ERA2 + 512, 512);
+        skipped.equihash_checked = false;
+        let a = Claim::join((&leaf(ERA2, 512), &LEAF_A), (&skipped, &LEAF_A), &reg, &AGG).unwrap();
+        assert!(!a.equihash_checked);
+        let b = Claim::join((&a, &AGG), (&leaf(ERA2 + 1024, 512), &LEAF_A), &reg, &AGG).unwrap();
+        assert!(!b.equihash_checked);
+    }
+
+    #[test]
+    fn allowing_a_revoked_key_again_does_not_restore_it() {
+        let mut reg = base();
+        reg.entries.push(revoke(LEAF_A, 0));
+        reg.entries.push(allow(Kind::HeaderLeaf, 2, ERA2, OPEN_END, LEAF_A));
+        assert_eq!(
+            Claim::join((&leaf(ERA2, 512), &LEAF_A), (&leaf(ERA2 + 512, 512), &LEAF_A), &reg, &AGG),
+            Err(Refused::LeafNotAllowed)
+        );
+        // The same holds for an aggregation key.
+        let mut reg = base();
+        reg.entries.push(revoke(AGG, 0));
+        reg.entries.push(allow(Kind::Aggregate, ANY_ERA, 0, OPEN_END, AGG));
+        assert_eq!(
+            Claim::join((&leaf(ERA2, 512), &LEAF_A), (&leaf(ERA2 + 512, 512), &LEAF_A), &reg, &AGG),
+            Err(Refused::OwnKeyNotAllowed)
+        );
+    }
+
 }
