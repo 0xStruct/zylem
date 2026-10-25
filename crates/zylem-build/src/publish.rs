@@ -31,7 +31,7 @@ pub struct Options<'a> {
     pub out: &'a Path,
 }
 
-fn named(dir: &Path, stem: &str, ext: &str, bytes: &[u8]) -> Result<String> {
+pub(crate) fn named(dir: &Path, stem: &str, ext: &str, bytes: &[u8]) -> Result<String> {
     let h = hex::encode(&Sha256::digest(bytes)[..8]);
     let name = format!("{stem}-{h}.{ext}");
     std::fs::write(dir.join(&name), bytes)?;

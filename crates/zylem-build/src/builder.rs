@@ -163,6 +163,7 @@ impl Builder {
             blocks,
             next_header,
             next_auth_data_root,
+            prev_record: vec![],
         })
     }
 
@@ -366,6 +367,7 @@ pub fn slice_dir(dir: &Path, network: &Network, from: u64, to: u64, out: &Path) 
         blocks: ring.blocks[skip..skip + n].to_vec(),
         next_header: ring.blocks[skip + n].header.clone(),
         next_auth_data_root: ring.blocks[skip + n].auth_data_root.clone(),
+        prev_record: vec![],
     };
     ring::verify(network, &slice, None).context("verifying the slice")?;
     std::fs::write(out, ring::encode_file(&slice))?;

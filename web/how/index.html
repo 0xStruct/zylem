@@ -682,10 +682,11 @@ zylem/spikes/header-proof/pipeline/run-shard.sh 0</pre>
     ~/out/shard-2.proof ~/out/shard-3.proof --groth16</pre>
         </div>
         <div class="cmd">
-          <header><span><b>4</b> Publish the proof, its block records and the Ring bindings</span><button class="copy" type="button" data-copy="b6">Copy</button></header>
+          <header><span><b>4</b> Publish the proof, its block records, the Ring bindings and light Rings</span><button class="copy" type="button" data-copy="b6">Copy</button></header>
           <pre id="b6">spikes/header-proof/sp1/target/release/export-proof ~/out/history.proof data/proofs/history
 ./target/release/zylem-build publish --jobs data/jobs/nu7 --history data/proofs/history \
-    --vks ~/out/vks.json --rings data/testnet --groth16 ~/out/history.groth16.bytes --out data/publish/nu7</pre>
+    --vks ~/out/vks.json --rings data/testnet --groth16 ~/out/history.groth16.bytes --out data/publish/nu7
+./target/release/zylem-build light --publish data/publish/nu7 --rings data/testnet</pre>
         </div>
         </div>
         <p class="note" style="margin-top:12px">With the program registry (generation 1), set <span class="mono">PROGRAMS=programs/testnet</span> before the pod scripts and publish with <span class="mono">--registry programs/testnet</span>. Without a GPU, <span class="mono">SP1_PROVER=mock</span> runs the same flow and checks every claim.</p>
@@ -698,7 +699,7 @@ zylem/spikes/header-proof/pipeline/run-shard.sh 0</pre>
             <thead><tr><th scope="col">Where</th><th scope="col">Use</th><th scope="col">Checks</th></tr></thead>
             <tbody>
               <tr><td>An existing wallet</td><td><span class="mono">zylem-proxy</span>, a drop-in light-wallet server</td><td>Every Ring from the checkpoint; the wallet only changes its server address</td></tr>
-              <tr><td>Browsers and phones</td><td>The WebAssembly client in <span class="mono">spikes/header-proof/wasm-verify</span> (1.8 MB)</td><td><span class="mono">RingFile.verify()</span> for a whole Ring; <span class="mono">verify_history</span> or <span class="mono">verify_history_v2</span> for the 1.27 MB proof; <span class="mono">verify_groth16</span> for the 356-byte proof; <span class="mono">check_all_records</span> and <span class="mono">verify_binding</span> to match a Ring to a proof</td></tr>
+              <tr><td>Browsers and phones</td><td>The WebAssembly client in <span class="mono">spikes/header-proof/wasm-verify</span> (1.8 MB)</td><td><span class="mono">RingFile.verify()</span> for a whole Ring; <span class="mono">verify_history</span> or <span class="mono">verify_history_v2</span> for the 1.27 MB proof; <span class="mono">verify_groth16</span> for the 356-byte proof; <span class="mono">check_all_records</span> and <span class="mono">verify_binding</span> to match a Ring to a proof; <span class="mono">RingFile.verify_light(publicValues, binding)</span> for a light Ring</td></tr>
               <tr><td>Contracts on EVM chains</td><td>SP1's Groth16 verifier for circuit v6.1.0: <span class="mono">SP1VerifierGroth16.sol</span> from <span class="mono">succinctlabs/sp1-contracts</span></td><td><span class="mono">verifyProof(programKey, publicValues, proof)</span> with Zylem's aggregation key: 303,762 gas in a local EVM. Not deployed on a chain yet</td></tr>
             </tbody>
           </table>

@@ -344,6 +344,14 @@ footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: gri
           </dl>
         </div>
       </div>
+      <div class="card">
+        <h3>Open the light Ring</h3>
+        <p class="muted" id="light-desc"></p>
+        <div class="facts" id="light-facts"></div>
+        <div class="controls"><button id="light-verify">Verify the light Ring</button><button class="ghost" id="light-attack">Simulate a fake note in a light block</button></div>
+        <div class="result" id="light-result"></div>
+        <div class="result" id="light-attack-result"></div>
+      </div>
       <div class="table-wrap"><table class="compare stack"><thead><tr><th>Same blocks, two ways</th><th>Check every header</th><th>Check the proof</th></tr></thead><tbody id="compare"></tbody></table></div>
     </section>
 
@@ -365,7 +373,7 @@ footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: gri
           <tr><td>Who can serve the data</td><td>A server you trust</td><td>Any host or mirror</td><td>Any host or mirror</td></tr>
           <tr><td>Download per 4,096 blocks</td><td class="mono" id="vs-light">compact data only</td><td class="mono" id="vs-full"></td><td class="mono" id="vs-proof"></td></tr>
           <tr><td>Runs on a phone</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td>Works with today's wallet apps</td><td>Yes</td><td>Yes, by pointing them at zylem-proxy</td><td>Not yet: light Rings are measured, not shipped</td></tr>
+          <tr><td>Works with today's wallet apps</td><td>Yes</td><td>Yes, by pointing them at zylem-proxy</td><td>Not yet: light Rings verify here (step 5), and zylem-proxy reads only full Rings so far</td></tr>
         </tbody>
       </table></div>
     </section>
@@ -537,7 +545,9 @@ function drawBytes(b) {
   $("bytes-bar").innerHTML = parts.map(([n, v, c]) => `<div title="${n}: ${mb(v)}" style="flex:${v} 0 0; background:var(${c})"></div>`).join("");
   $("bytes-legend").innerHTML = parts.map(([n, v, c]) => `<span><i style="background:var(${c})"></i>${n} <b class="mono">${(100 * v / b.decompressed).toFixed(0)}%</b> <span class="mono">${mb(v)}</span></span>`).join("") +
     `<span>decompressed ${mb(b.decompressed)}, stored as ${mb(b.file)}</span>` +
-    (FILES.rings[currentKey].light_bytes ? `<span>with a proof, as a light Ring: <b class="mono">${mb(FILES.rings[currentKey].light_bytes)}</b> (step 5)</span>` : "");
+    (currentKey === "proven"
+      ? `<span>as a light Ring with this page's proof: <b class="mono">${mb(FILES.light.bytes)}</b>, or about ${mb(FILES.rings.proven.light_bytes)} once every block is proven (step 5)</span>`
+      : `<span>as a light Ring once a proof covers it: about <b class="mono">${mb(FILES.rings.payment.light_bytes)}</b> (step 5)</span>`);
 }
 
 function busiest() {
@@ -787,10 +797,46 @@ $("rec-show").addEventListener("click", () => busy($("rec-show"), async () => {
   ]));
 }));
 
+let lightRing = null;
+const L = FILES.light;
+const lightBlocks = L.light[1] - L.light[0] + 1;
+$("light-verify").addEventListener("click", () => busy($("light-verify"), async () => {
+  // A client checks the proof first, then binds the Ring's records to it.
+  const { proof, pv } = await proofParts(L.proof);
+  const p = timed(() => JSON.parse(zv.verify_history(proof, pv, hexToBytes(P.agg_vk_bincode), trustedFor(L.proof))));
+  if (!p.ok) return show($("light-result"), false, "the proof was refused", `<span class="mono">${esc(p.error)}</span>`);
+  if (!lightRing) lightRing = new zv.RingFile(await fetchBytes(L.file));
+  const r = timed(() => JSON.parse(lightRing.verify_light(pv, JSON.stringify(L.binding))));
+  const bare = timed(() => lightRing.verify());
+  mark($("light-verify"), r.ok);
+  if (r.ok) {
+    complete(5);
+    show($("light-result"), true, `all ${fmt(r.value.blocks)} blocks and ${fmt(r.value.transactions)} transactions, in ${ms(p.ms + r.ms)}`, kv([
+      ["Light blocks", `${fmt(L.light[0])}–${fmt(L.light[1])}: their records are the ones the proof commits to, which stands in for their Equihash and difficulty checks`],
+      ["Other blocks", "full headers, checked as in step 2"],
+      ["Every block", "transaction IDs rebuilt and matched to the Merkle root, history tree and note trees checked, as in step 2"],
+      ["The same Ring without the proof", bare.ok ? "accepted" : `refused: ${bare.error}`],
+    ]));
+  } else show($("light-result"), false, `after ${ms(p.ms + r.ms)}`, `<span class="mono">${esc(r.error)}</span>`);
+}));
+$("light-attack").addEventListener("click", () => busy($("light-attack"), async () => {
+  const { pv } = await proofParts(L.proof);
+  if (!lightRing) lightRing = new zv.RingFile(await fetchBytes(L.file));
+  const h = L.light[0] + 500;
+  const a = timed(() => lightRing.attacked("inject", h, undefined));
+  if (!a.ok) return show($("light-attack-result"), false, esc(a.error));
+  const what = a.value.altered || "";
+  const r = timed(() => a.value.verify_light(pv, JSON.stringify(L.binding)));
+  a.value.free();
+  const el = $("light-attack-result");
+  if (r.ok) { el.className = "result bad"; el.innerHTML = `<span class="verdict">Accepted</span>${esc(what)}. This should never happen.`; }
+  else { el.className = "result ok"; el.innerHTML = `<span class="verdict">Caught</span>${esc(r.error)}<div class="muted" style="margin-top:6px">The simulated copy ${esc(what)}; refused in ${ms(r.ms)}, with the proof's records intact. A light block's transactions are checked as fully as any other.</div>`; }
+}));
+
 function renderVersus() {
   const r = FILES.rings.payment;
   $("vs-full").textContent = `${mb(r.bytes)} Ring`;
-  $("vs-proof").textContent = `${mb(r.light_bytes)} light Ring + a share of one proof (356 bytes)`;
+  $("vs-proof").textContent = `about ${mb(r.light_bytes)} light Ring once proven + a share of one proof (356 bytes)`;
   if (current) $("vs-light").textContent = `about ${mb(current.summary.bytes.compact_blocks)} of compact blocks`;
 }
 
@@ -802,7 +848,7 @@ function renderCompare() {
   $("compare").innerHTML = [
     [`Download for ${fmt(n)} blocks`, mb(n * HEADER_BYTES) + " of headers", `356-byte proof (or ${mb(proofBytes)} without a trusted setup) + ${mb(n * RECORD_BYTES)} of records`],
     [`Time for ${fmt(n)} blocks, this browser`, t(timesFor.headers), timesFor.proof == null ? t(null) : `${ms(timesFor.proof)} for the proof` + (timesFor.match == null ? ", then match the Ring" : ` + ${ms(timesFor.match)} to match the Ring`)],
-    ["One Ring of 4,096 blocks", mb(FILES.rings.payment.bytes) + " (full headers)", `${mb(FILES.rings.payment.light_bytes)} with records instead of headers, plus one proof shared by every Ring it covers`],
+    ["One Ring of 4,096 blocks", mb(FILES.rings.payment.bytes) + " (full headers)", `about ${mb(FILES.rings.payment.light_bytes)} once every block is proven, plus one proof shared by every Ring it covers. The light Ring above, with ${fmt(lightBlocks)} blocks proven, is ${mb(L.bytes)}.`],
     [`Download for ${fmt(n0)} blocks (NU7 proof)`, mb(n0 * HEADER_BYTES) + " of headers", `one proof + ${mb(n0 * RECORD_BYTES)} of records`],
     ["Trusts", "the cryptography and a checkpoint", "also SP1 and the two pinned programs"],
   ].map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("");
@@ -826,6 +872,10 @@ async function main() {
     $("smoke-desc").textContent = `${fmt(s.to - s.from + 1)} headers, ${fmt(s.from)}–${fmt(s.to)}, proved as ${s.leaves} leaves of 512 on an RTX 5090, with Equihash. They sit inside the second Ring.`;
     $("shard-desc").textContent = `${fmt(z.to - z.from + 1)} headers, ${fmt(z.from)}–${fmt(z.to)}, the first ${z.leaves} leaves after NU7 activated, joined into one proof.`;
     $("rec-height").value = z.from + 4321;
+    $("light-desc").textContent = `The second Ring as a light Ring: its ${fmt(lightBlocks)} blocks inside the proof above carry their 104-byte records instead of 1,487-byte headers. The rest of the Ring keeps its headers. The page checks the proof, then checks the records against the commitment inside it.`;
+    $("light-facts").innerHTML = [
+      [mb(L.full_bytes), "full Ring"], [mb(L.bytes), "light Ring"], [`${fmt(lightBlocks)} of ${fmt(L.to - L.from + 1)}`, "blocks light"],
+    ].map(([b, t]) => `<div class="fact"><b>${b}</b><span>${t}</span></div>`).join("");
     $("txid").value = DEMO.txid;
     $("trust-kv").innerHTML = [
       ["Leaf program", P.leaf_bytes32], ["Aggregation program", P.agg_bytes32],

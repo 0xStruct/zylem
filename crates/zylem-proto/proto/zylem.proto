@@ -3,6 +3,11 @@
 // A Ring is one epoch of chain history that any client can check against block
 // headers: headers, every transaction of every block in compact form, and the
 // auxiliary digests that rebuild each transaction ID from that compact form.
+//
+// A light Ring replaces the headers of blocks a history proof covers with the 104-byte
+// records the proof commits to (hash, Merkle root, block commitments, time, bits). The
+// proof stands in for their Equihash and difficulty checks; everything else is checked
+// as in a full Ring.
 
 syntax = "proto3";
 package zylem.v1;
@@ -39,13 +44,14 @@ message ActionsAux {
 }
 
 message RingBlock {
-    bytes header = 1;                // the full 1,487-byte block header
+    bytes header = 1;                // the full 1,487-byte block header; empty in a light block
     cash.z.wallet.sdk.rpc.CompactBlock block = 2; // every transaction, all pools, in block order
     repeated TxAux aux = 3;          // one per transaction, same order
     bytes auth_data_root = 4;        // ZIP 244 hashAuthDataRoot
     bytes sapling_root = 5;          // note commitment tree roots after this block
     bytes orchard_root = 6;
     bytes ironwood_root = 7;
+    bytes record = 8;                // light block: its 104-byte proven record instead of the header
 }
 
 message HistoryPeak {
@@ -72,4 +78,7 @@ message Ring {
     repeated RingBlock blocks = 6;
     bytes next_header = 7;           // header of end_height + 1; absent for the open tail
     bytes next_auth_data_root = 8;
+    // A light Ring whose first block is not the proof's first: the proven record of the
+    // block before start_height, which links the Ring to the proof.
+    bytes prev_record = 9;
 }

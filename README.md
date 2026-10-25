@@ -32,6 +32,9 @@ run end to end on testnet (NU7, Ironwood):
 Phase 3 so far: the difficulty and time rules are enforced natively; 1.55M real testnet
 headers from NU6 across NU7 pass them, and Zylem agrees with Zakura on 400,000 random
 contexts, Equihash, and 46,542 rebuilt transaction IDs ([docs/phase3.md](docs/phase3.md)).
+SP1 proofs of real testnet headers with Equihash verify in WebAssembly, and light Rings
+carry the proven blocks' 104-byte records instead of headers: `zylem-build light` makes
+them from a published proof and the client checks them against it.
 
 Numbers: [docs/phase0.md](docs/phase0.md). Demo: [docs/demo.md](docs/demo.md).
 Build Rings, prove them in SP1 and verify them (proxy, WebAssembly, Groth16 contract):
@@ -44,7 +47,7 @@ Build Rings, prove them in SP1 and verify them (proxy, WebAssembly, Groth16 cont
 | `zylem-header` | The header-chain rules (difficulty adjustment, median time, work, Equihash, header encoding) and the canonical records commitment, shared with the zkVM programs |
 | `zylem-core` | Pure verification: headers (Equihash, target, difficulty rule, chain work), transaction-ID rebuild for v4/v5/v6, Merkle roots (rejecting duplicate IDs), the history-tree replay, note commitment trees, Ring encoding and checks |
 | `zylem-proto` | The light-wallet protocol (with server stubs) and the Ring format, compiled without `protoc` |
-| `zylem-build` | Builds Rings from a pruned Zakura node, verifies them, serves them over HTTP; also the Phase 0 spikes and a `tamper` tool for demos |
+| `zylem-build` | Builds Rings from a pruned Zakura node, verifies them, serves them over HTTP, publishes history proofs and makes light Rings from them; also the Phase 0 spikes and a `tamper` tool for demos |
 | `zylem-proxy` | A `CompactTxStreamer` server that serves only verified blocks, tree states and subtree roots, checks what it relays from an upstream server, and has an audit mode |
 
 ## Trust model

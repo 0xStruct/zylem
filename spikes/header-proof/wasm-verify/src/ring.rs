@@ -8,11 +8,22 @@ use serde_json::{json, Value};
 use wasm_bindgen::prelude::*;
 use zcash_protocol::consensus::Network;
 use zylem_core::{block, header::Header, ring, tamper};
-use zylem_header::{record_of, RECORD_SIZE};
+use zylem_header::{record_of, Claim, Peaks, RangeClaim, RECORD_SIZE};
 use zylem_proto::{ring::Ring, Message};
 
 fn err(e: impl core::fmt::Display) -> JsError {
     JsError::new(&e.to_string())
+}
+
+/// A block's header fields: parsed from its header, or taken from its record in a light
+/// block (with the compact block's previous hash, for display only).
+fn header_of(height: u64, rb: &zylem_proto::ring::RingBlock) -> Result<Header, JsError> {
+    if rb.record.is_empty() {
+        return Header::parse_unchecked(height, &rb.header).map_err(err);
+    }
+    let record: [u8; RECORD_SIZE] = rb.record[..].try_into().map_err(|_| JsError::new("a record is 104 bytes"))?;
+    let prev = rb.block.as_ref().and_then(|b| b.prev_hash[..].try_into().ok()).unwrap_or([0; 32]);
+    Ok(Header::from_record(height, &record, prev))
 }
 
 /// Hashes are stored in internal byte order; explorers show them reversed.
@@ -53,8 +64,11 @@ impl RingFile {
         let r = &self.ring;
         let (mut txs, mut vin, mut vout, mut spends, mut outputs, mut orchard, mut ironwood) = (0, 0, 0, 0, 0, 0, 0);
         let (mut header_bytes, mut compact_bytes, mut aux_bytes, mut v4_full) = (0, 0, 0, 0);
+        let (mut record_bytes, mut light) = (0, 0);
         for b in &r.blocks {
             header_bytes += b.header.len();
+            record_bytes += b.record.len();
+            light += usize::from(!b.record.is_empty());
             aux_bytes += b.aux.iter().map(|a| a.encoded_len()).sum::<usize>();
             v4_full += b.aux.iter().filter(|a| !a.full_tx.is_empty()).count();
             if let Some(cb) = &b.block {
@@ -77,6 +91,7 @@ impl RingFile {
             "start_height": r.start_height,
             "end_height": r.end_height,
             "blocks": r.blocks.len(),
+            "light_blocks": light,
             "sealed": !r.next_header.is_empty(),
             "transactions": txs,
             "v4_with_full_bytes": v4_full,
@@ -88,6 +103,7 @@ impl RingFile {
                 "file": self.file_bytes,
                 "decompressed": self.raw_bytes,
                 "headers": header_bytes,
+                "records": record_bytes,
                 "compact_blocks": compact_bytes,
                 "aux": aux_bytes,
             },
@@ -132,7 +148,7 @@ impl RingFile {
             return Err(JsError::new("height outside this Ring"));
         }
         let rb = &self.ring.blocks[(h - self.ring.start_height) as usize];
-        let header = Header::parse_unchecked(h, &rb.header).map_err(err)?;
+        let header = header_of(h, rb)?;
         let vb = block::verify(&header, rb, &self.network).map_err(err)?;
         let cb = rb.block.as_ref().ok_or_else(|| JsError::new("no compact block"))?;
         let txs: Vec<Value> = cb
@@ -164,7 +180,8 @@ impl RingFile {
             "block_commitments": display(&header.commitments),
             "time": header.time,
             "bits": format!("{:08x}", header.bits),
-            "header_bytes": rb.header.len(),
+            "header_bytes": rb.header.len().max(rb.record.len()),
+            "light": !rb.record.is_empty(),
             "roots_after": {
                 "sapling": display(&rb.sapling_root),
                 "orchard": display(&rb.orchard_root),
@@ -183,6 +200,43 @@ impl RingFile {
     /// authenticated roots. Throws with the typed reason on the first failure.
     pub fn verify(&self) -> Result<String, JsError> {
         let v = ring::verify(&self.network, &self.ring, None).map_err(err)?;
+        self.report(v)
+    }
+
+    /// The client check of a light Ring against a history proof: as `verify`, with the
+    /// light blocks' records bound to the proof's records commitment by the sibling
+    /// hashes in `binding_json` (`{"paths": [["hex", ...], ...]}`, as `zylem-build light`
+    /// publishes them), in place of their Equihash and difficulty checks. Verify the proof
+    /// itself first (`verify_history`): this trusts its claim.
+    pub fn verify_light(&self, public_values: &[u8], binding_json: &str) -> Result<String, JsError> {
+        let (first, last, anchor, equihash, records): (u64, u64, [u8; 32], bool, Peaks) = match Claim::decode(public_values) {
+            Some(c) => (c.first_height, c.last_height, c.anchor_hash, c.equihash_checked, c.records),
+            None => {
+                let c = RangeClaim::decode(public_values).ok_or_else(|| JsError::new("the public values are not a Zylem claim"))?;
+                (c.first_height, c.last_height, c.anchor_hash, c.equihash_checked, c.records)
+            }
+        };
+        let b: Value = serde_json::from_str(binding_json).map_err(err)?;
+        let paths = b["paths"]
+            .as_array()
+            .ok_or_else(|| JsError::new("the binding has no paths"))?
+            .iter()
+            .map(|p| {
+                p.as_array()
+                    .ok_or_else(|| JsError::new("a path is a list"))?
+                    .iter()
+                    .map(|h| hex::decode(h.as_str().unwrap_or_default()).ok().and_then(|v| v.try_into().ok()).ok_or_else(|| JsError::new("a sibling hash is 32 bytes")))
+                    .collect::<Result<Vec<[u8; 32]>, JsError>>()
+            })
+            .collect::<Result<Vec<_>, JsError>>()?;
+        let proven = ring::Proven { first_height: first, last_height: last, anchor_hash: anchor, equihash_checked: equihash, records: &records, paths: &paths };
+        let v = ring::verify_light(&self.network, &self.ring, None, &proven).map_err(err)?;
+        self.report(v)
+    }
+}
+
+impl RingFile {
+    fn report(&self, v: ring::VerifiedRing) -> Result<String, JsError> {
         let txs: usize = v.blocks.iter().map(|b| b.txids.len()).sum();
         *self.txids.borrow_mut() = Some(v.blocks.iter().map(|b| b.txids.clone()).collect());
         let mut work = [0u8; 32];
@@ -196,9 +250,14 @@ impl RingFile {
             "difficulty_checked_from": v.context_checked_from,
             "work": hex::encode(work),
             "last_hash": display(&v.last_header().hash),
+            "light": v.light,
         })
         .to_string())
     }
+}
+
+#[wasm_bindgen]
+impl RingFile {
 
     /// Finds a transaction by its ID among the IDs rebuilt by `verify`.
     pub fn find_tx(&self, txid_display: &str) -> Result<String, JsError> {
@@ -224,6 +283,10 @@ impl RingFile {
         let mut out = Vec::with_capacity((to - from + 1) as usize * RECORD_SIZE);
         for h in from..=to {
             let rb = &self.ring.blocks[(h - self.ring.start_height) as usize];
+            if !rb.record.is_empty() {
+                out.extend_from_slice(&rb.record);
+                continue;
+            }
             let header = Header::parse_unchecked(h, &rb.header).map_err(err)?;
             out.extend_from_slice(&record_of(&rb.header, &header.hash));
         }
@@ -240,6 +303,9 @@ impl RingFile {
         let mut prev: Option<[u8; 32]> = None;
         for h in from..=to {
             let rb = &self.ring.blocks[(h - self.ring.start_height) as usize];
+            if !rb.record.is_empty() {
+                return Err(JsError::new(&format!("block {h} is light: a history proof vouches for it")));
+            }
             let header = Header::parse_and_check(h, &rb.header).map_err(err)?;
             if prev.is_some_and(|p| p != header.prev_hash) {
                 return Err(JsError::new(&format!("header {h} does not link to its predecessor")));

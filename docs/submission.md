@@ -28,12 +28,13 @@ WHAT IS REAL
 - Real GPU proofs (SP1 6.9.0, one RTX 5090, Equihash proven): blocks 4,465,026 to 4,481,409 (32 leaves of 512 headers), and 4,527,490 to 4,529,025 with its 356-byte Groth16 wrap. About 5 minutes and $0.09 per 512-header leaf.
 - In a browser: a full Ring check takes about 2.5 s, a history proof about 60 ms, the Groth16 wrap about 0.3 s.
 - SP1's Groth16 verifier contract (v6.1.0) accepts the wrap in a local EVM for 303,762 gas, and refuses an altered claim, another program's key and an altered proof.
+- Light Rings: proven blocks carry 104-byte records instead of 1,487-byte headers, checked against the proof natively and in the browser.
 
 WHAT IS A MOCK OR NOT DONE
 - The demo's attacks are simulated: the page edits a real Ring the way a malicious server would, then runs the real checks on it.
 - Testnet only. The proofs cover two ranges, not all of NU7; about 90 more leaves close the gap. The generation 1 program registry is tested with mock and small CPU proofs only.
 - Nothing is deployed on a chain. The oracle contract is an example, without a freshness rule.
-- Light Rings (backed by a proof, about 2 MB instead of 7.6 MB) are measured, not shipped.
+- Light Rings work, but no proof covers a whole Ring yet: the one light Ring, with 1,536 of its 4,096 blocks proven, is 5.10 MB instead of 7.19 MB (about 2 MB once fully proven). zylem-proxy reads only full Rings.
 - The mempool and the completeness of transparent-address lookups are not verified.
 
 Live demo: https://zylem.cash/demo/
@@ -56,6 +57,7 @@ REAL (testnet, NU7)
 - Real SP1 GPU proofs with Equihash: 32 leaves (16,384 blocks) and a 3-leaf range with its Groth16 wrap
 - Browser: Ring check ~2.5 s, proof ~60 ms
 - SP1's Groth16 contract accepts the wrap in a local EVM: 303,762 gas
+- Light Rings: proven blocks carry 104-byte records, not headers (7.19 → 5.10 MB with 1,536 blocks proven)
 
 MOCK / NOT DONE
 - Demo attacks are simulated: the page tampers a real Ring, real checks reject it

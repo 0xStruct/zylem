@@ -4,6 +4,7 @@ mod builder;
 mod lwd;
 mod lwdcheck;
 mod jobs;
+mod light;
 mod node;
 mod publish;
 mod replay;
@@ -179,6 +180,16 @@ enum Cmd {
         #[arg(long)]
         out: std::path::PathBuf,
     },
+    /// Make light Rings for a published history proof: every sealed Ring it covers, with
+    /// the covered blocks' records in place of headers, verified and bound to the proof.
+    Light {
+        /// `publish` output directory; light Rings and bindings are written into it.
+        #[arg(long)]
+        publish: std::path::PathBuf,
+        /// Ring directory with its manifest.
+        #[arg(long)]
+        rings: std::path::PathBuf,
+    },
     /// Ask a light-wallet server (or zylem-proxy) for its tip, as a wallet's first sync
     /// call does, and print its vendor string.
     Probe {
@@ -233,6 +244,7 @@ async fn main() -> Result<()> {
             groth16: groth16.as_deref(),
             out: &out,
         }),
+        Cmd::Light { publish, rings } => light::run(&publish, &rings, &net),
         Cmd::Probe { lwd, block } => {
             let mut c = lwd::connect(&lwd).await?;
             if let Some(h) = block {

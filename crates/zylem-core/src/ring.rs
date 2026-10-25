@@ -4,6 +4,7 @@
 use primitive_types::U256;
 use prost::Message;
 use zcash_protocol::consensus::Network;
+use zylem_header::{Peaks, RECORD_SIZE};
 use zylem_proto::ring::{Ring, RingBlock};
 
 use crate::{
@@ -63,6 +64,47 @@ pub struct Continuation<'a> {
     pub context: &'a DifficultyContext,
 }
 
+/// What a history proof commits to, from a claim the client has already verified (its
+/// program keys, its anchor, that it checked Equihash), and the sibling hashes that bind a
+/// light Ring's records to it.
+pub struct Proven<'a> {
+    pub first_height: u64,
+    pub last_height: u64,
+    /// Hash of the block before `first_height`, which the proof starts from.
+    pub anchor_hash: [u8; 32],
+    pub equihash_checked: bool,
+    pub records: &'a Peaks,
+    /// `zylem_header::range_paths` for `binding_range` of the Ring's light blocks.
+    pub paths: &'a [Vec<[u8; 32]>],
+}
+
+impl Proven<'_> {
+    /// The heights a light Ring's binding covers: its light blocks, and the block before
+    /// them when the proof covers that one too, since the first light block links to it.
+    pub fn binding_range(first_height: u64, light_first: u64, light_last: u64) -> (u64, u64) {
+        (if light_first > first_height { light_first - 1 } else { light_first }, light_last)
+    }
+}
+
+/// Makes blocks `from..=to` of a full Ring light: each carries its 104-byte record instead
+/// of its header. A light run that starts at the Ring's first block and inside the proof
+/// also carries `prev_record`, the proven record of the block before the Ring.
+pub fn lighten(ring: &mut Ring, from: u64, to: u64, prev_record: Option<[u8; RECORD_SIZE]>) -> Result<(), Reject> {
+    if from < ring.start_height || to > ring.end_height || from > to {
+        return Err(Reject::malformed("light range", format!("{from}..={to}")));
+    }
+    for h in from..=to {
+        let rb = &mut ring.blocks[(h - ring.start_height) as usize];
+        rb.record = Header::parse_unchecked(h, &rb.header)?.record().to_vec();
+        rb.header.clear();
+    }
+    ring.prev_record = match prev_record {
+        Some(r) if from == ring.start_height => r.to_vec(),
+        _ => vec![],
+    };
+    Ok(())
+}
+
 /// A Ring whose every block passed.
 pub struct VerifiedRing {
     pub start_height: u64,
@@ -82,6 +124,8 @@ pub struct VerifiedRing {
     /// First height whose difficulty and time rules were checked: every later header in
     /// the Ring was. `None` if the context never became long enough.
     pub context_checked_from: Option<u64>,
+    /// The light blocks, whose records a history proof vouched for instead of headers.
+    pub light: Option<(u64, u64)>,
 }
 
 impl VerifiedRing {
@@ -120,6 +164,20 @@ fn claimed_roots(rb: &RingBlock, height: u64) -> Result<Roots, Reject> {
 ///    authenticated roots, which authenticates the start frontiers and so every tree state
 ///    inside the Ring.
 pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Result<VerifiedRing, Reject> {
+    check(network, ring, prev, None)
+}
+
+/// Checks a light Ring against a history proof. As `verify`, except that light blocks take
+/// their header fields from their records, and those records (with the block before them
+/// when the proof covers it) must be the ones the proof commits to: the proof replaces
+/// their Equihash, target, link and difficulty checks. Transaction IDs, Merkle roots, the
+/// history tree and the note commitment trees are checked as in a full Ring, and the
+/// headers around the light blocks must link to them. A full Ring passes too.
+pub fn verify_light(network: &Network, ring: &Ring, prev: Option<Continuation>, proven: &Proven) -> Result<VerifiedRing, Reject> {
+    check(network, ring, prev, Some(proven))
+}
+
+fn check(network: &Network, ring: &Ring, prev: Option<Continuation>, proven: Option<&Proven>) -> Result<VerifiedRing, Reject> {
     if ring.format != FORMAT {
         return Err(Reject::Unsupported(format!("ring format {}", ring.format)));
     }
@@ -162,14 +220,73 @@ pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Res
     let mut context = prev.as_ref().map(|p| p.context.clone()).unwrap_or_default();
     let mut context_checked_from = None;
 
+    // Light blocks form one run inside the proof's range.
+    let light: Vec<u64> = (first..).zip(&ring.blocks).filter(|(_, b)| !b.record.is_empty()).map(|(h, _)| h).collect();
+    let run = match (light.first(), light.last()) {
+        (Some(&a), Some(&b)) => {
+            if (b - a + 1) as usize != light.len() {
+                return Err(Reject::malformed("ring", "light blocks are not contiguous"));
+            }
+            let p = proven.ok_or(Reject::RecordNotProven { height: a })?;
+            if !p.equihash_checked || a < p.first_height || b > p.last_height {
+                return Err(Reject::RecordNotProven { height: a });
+            }
+            Some((a, b, p))
+        }
+        _ => None,
+    };
+    // The records checked against the proof, from `Proven::binding_range`.
+    let mut proven_records: Vec<[u8; RECORD_SIZE]> = vec![];
+    match run {
+        Some((a, _, p)) if a == first && a > p.first_height => {
+            let r: [u8; RECORD_SIZE] = ring.prev_record[..]
+                .try_into()
+                .map_err(|_| Reject::malformed("ring", "a light Ring starting inside a proof carries its predecessor's record"))?;
+            let hash: [u8; 32] = r[..32].try_into().unwrap();
+            if prev_hash.is_some_and(|p| p != hash) {
+                return Err(Reject::BrokenChain { height: first });
+            }
+            prev_hash = Some(hash);
+            proven_records.push(r);
+        }
+        _ if !ring.prev_record.is_empty() => return Err(Reject::malformed("ring", "unexpected predecessor record")),
+        _ => {}
+    }
+
     for (i, rb) in ring.blocks.iter().enumerate() {
         let height = first + i as u64;
-        let header = Header::parse_and_check(height, &rb.header)?;
-        if let Some(p) = prev_hash {
-            if header.prev_hash != p {
-                return Err(Reject::BrokenChain { height });
+        let header = match run {
+            Some((a, _, p)) if !rb.record.is_empty() => {
+                if !rb.header.is_empty() {
+                    return Err(Reject::malformed("ring block", format!("{height} has both a header and a record")));
+                }
+                let record: [u8; RECORD_SIZE] = rb.record[..].try_into().map_err(|_| Reject::malformed("record", height))?;
+                // The proof chains its records, so each links to the one before; the first
+                // links to the proof's anchor, or to the proven block before it.
+                let pred = if height == a && a == p.first_height {
+                    if prev_hash.is_some_and(|h| h != p.anchor_hash) {
+                        return Err(Reject::BrokenChain { height });
+                    }
+                    p.anchor_hash
+                } else {
+                    if height == a && height > first {
+                        proven_records.push(blocks.last().map(|b: &VerifiedBlock| b.header.record()).expect("a block before"));
+                    }
+                    prev_hash.ok_or(Reject::RecordNotProven { height })?
+                };
+                proven_records.push(record);
+                Header::from_record(height, &record, pred)
             }
-        }
+            _ => {
+                let header = Header::parse_and_check(height, &rb.header)?;
+                if let Some(p) = prev_hash {
+                    if header.prev_hash != p {
+                        return Err(Reject::BrokenChain { height });
+                    }
+                }
+                header
+            }
+        };
         // The context needed grows at NU7 (17 to 102 blocks), so a Ring without a prior
         // context can stop being checkable for a while; only an unbroken run counts.
         if context.check_and_push(network, &header)? {
@@ -224,6 +341,11 @@ pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Res
         ring.end_height - 1
     };
 
+    if let Some((a, b, p)) = run {
+        let (from, _) = Proven::binding_range(p.first_height, a, b);
+        p.records.verify_range(from, &proven_records, p.paths).map_err(|_| Reject::RecordNotProven { height: a })?;
+    }
+
     if authenticated_to >= first {
         let idx = (authenticated_to - first) as usize;
         let computed = trees_after[idx].roots();
@@ -251,5 +373,6 @@ pub fn verify(network: &Network, ring: &Ring, prev: Option<Continuation>) -> Res
         work,
         context_after: context,
         context_checked_from,
+        light: run.map(|(a, b, _)| (a, b)),
     })
 }

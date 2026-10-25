@@ -104,6 +104,20 @@ spikes/header-proof/sp1/target/release/export-proof ~/out/history.proof data/pro
 `history.json`, the proof and its public values, every block's record, the Rings, and for
 each Ring inside the proven range the few hashes that bind it to the proof.
 
+### Light Rings
+
+```bash
+./target/release/zylem-build light --publish data/publish/nu7 --rings data/testnet
+```
+
+For every sealed Ring the proof covers, this writes a light copy into the publish
+directory: proven blocks carry their 104-byte records instead of their 1,487-byte headers,
+and the Ring's other blocks keep their headers. A binding file holds the sibling hashes
+that tie those records to the proof, and `light.json` lists them. Each light Ring is
+checked against the proof before it is written. On testnet, the Ring 4,526,466–4,530,561,
+with the smoke proof's 1,536 blocks light, drops from 7.19 MB to 5.10 MB. With every
+block proven, a Ring is about 2 MB.
+
 ## 3. Verify
 
 ### In a wallet today: `zylem-proxy`
@@ -139,6 +153,7 @@ wasm-pack build --release --target nodejs --out-dir pkg-node   # Node
 | `verify_history(proof, publicValues, aggKey, trusted)` | a 1.27 MB history proof (generation 0), pinned to both program keys and a starting block |
 | `verify_history_v2(proof, publicValues, registry, pinnedRoots, trusted)` | the same for generation 1, pinned to registry roots |
 | `check_all_records(publicValues, records)`, `verify_binding(…)`, `check_range(…)` | that a Ring's blocks are the ones a proof commits to |
+| `.verify_light(publicValues, bindingJson)` | a light Ring: its records against the proof (verify the proof first), every other check as in `.verify()` |
 | `verify_groth16(proof, publicValues, programKey)` | the 356-byte Groth16 wrap |
 
 `demo/index.html` uses all of these; `demo/stage.py` and `web/build.py` stage it with real
@@ -167,7 +182,7 @@ production contract also needs a freshness rule and links between submitted rang
 | Path | Trusts |
 |---|---|
 | Rings checked directly (proxy, `RingFile.verify`) | the cryptography, a checkpoint, honest-majority hashpower |
-| Rings plus a history proof | also SP1 and Zylem's proving programs (pinned keys or a registry root) |
+| Rings plus a history proof, or light Rings | also SP1 and Zylem's proving programs (pinned keys or a registry root) |
 | The 356-byte wrap (phones, contracts) | also SP1's Groth16 trusted setup |
 
 Program keys in use: generation 0 aggregation

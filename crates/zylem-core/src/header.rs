@@ -67,7 +67,37 @@ impl Header {
     }
 }
 
-pub use zylem_header::{expand as expand_bits, work as work_from_target};
+impl Header {
+    /// The header fields a light block's 104-byte record carries (hash, Merkle root, block
+    /// commitments, time, bits). Nothing is checked: a history proof vouches for the
+    /// record, and the proof's chain gives `prev_hash`.
+    pub fn from_record(height: u64, record: &[u8; RECORD_SIZE], prev_hash: [u8; 32]) -> Self {
+        let bits = u32::from_le_bytes(record[100..104].try_into().unwrap());
+        Header {
+            height,
+            hash: record[..32].try_into().unwrap(),
+            prev_hash,
+            merkle_root: record[32..64].try_into().unwrap(),
+            commitments: record[64..96].try_into().unwrap(),
+            time: u32::from_le_bytes(record[96..100].try_into().unwrap()),
+            bits,
+            work: work_from_bits(bits),
+        }
+    }
+
+    /// The record a history proof commits to for this header (`zylem_header::record_of`).
+    pub fn record(&self) -> [u8; RECORD_SIZE] {
+        let mut r = [0u8; RECORD_SIZE];
+        r[..32].copy_from_slice(&self.hash);
+        r[32..64].copy_from_slice(&self.merkle_root);
+        r[64..96].copy_from_slice(&self.commitments);
+        r[96..100].copy_from_slice(&self.time.to_le_bytes());
+        r[100..104].copy_from_slice(&self.bits.to_le_bytes());
+        r
+    }
+}
+
+pub use zylem_header::{expand as expand_bits, work as work_from_target, RECORD_SIZE};
 
 /// Work for a compact `nBits`, or zero if the encoding is invalid.
 pub fn work_from_bits(bits: u32) -> U256 {

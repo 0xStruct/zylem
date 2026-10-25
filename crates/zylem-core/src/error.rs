@@ -34,6 +34,8 @@ pub enum Reject {
     HistoryMismatch { height: u64 },
     #[error("{pool} note commitment tree root mismatch at height {height}")]
     TreeRootMismatch { height: u64, pool: &'static str },
+    #[error("block {height} carries a record no history proof vouches for")]
+    RecordNotProven { height: u64 },
     #[error("chain work of the offered tip is lower than the known tip")]
     ChainWorkLower,
     #[error("tip is stale: newest header is {age_secs} s old")]
