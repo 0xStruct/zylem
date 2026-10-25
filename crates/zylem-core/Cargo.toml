@@ -8,7 +8,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
-zylem-proto.workspace = true
+# Message types only; the gRPC stubs are for the server crates.
+zylem-proto = { path = "../zylem-proto", default-features = false }
 zylem-header.workspace = true
 zcash_primitives.workspace = true
 zcash_protocol.workspace = true
@@ -22,11 +23,18 @@ blake2b_simd.workspace = true
 sha2.workspace = true
 primitive-types.workspace = true
 prost.workspace = true
-zstd.workspace = true
 thiserror.workspace = true
 hex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+# Ring files are zstd. WebAssembly has no C toolchain, so clients there decode with a
+# pure-Rust decoder; only native builders compress.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+zstd.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+ruzstd = "0.8"
 
 [dev-dependencies]
 hex.workspace = true

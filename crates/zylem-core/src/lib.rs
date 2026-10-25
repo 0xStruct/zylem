@@ -8,6 +8,7 @@ pub mod history;
 pub mod manifest;
 pub mod merkle;
 pub mod ring;
+pub mod tamper;
 pub mod tree;
 pub mod txid;
 

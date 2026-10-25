@@ -1,6 +1,9 @@
 //! Zylem client verification compiled to WebAssembly: the calls a wallet or a web page
 //! makes. Every function returns a JSON string, or throws with the reason a check failed.
 
+mod ring;
+pub use ring::RingFile;
+
 use serde_json::json;
 use wasm_bindgen::prelude::*;
 use zylem_header::{range_paths, Claim, Kind, Peaks, RangeClaim, Registry, ANY_ERA, RECORD_SIZE};

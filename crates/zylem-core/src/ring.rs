@@ -16,10 +16,12 @@ use crate::{
 };
 
 pub const FORMAT: u32 = 1;
+#[cfg(not(target_arch = "wasm32"))]
 const ZSTD_LEVEL: i32 = 9;
 
 /// A Ring file: zstd over the protobuf encoding. Encoding is deterministic, so two
 /// builders of the same chain produce byte-identical files.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn encode_file(ring: &Ring) -> Vec<u8> {
     zstd::encode_all(&ring.encode_to_vec()[..], ZSTD_LEVEL).expect("compressing in memory")
 }
@@ -29,7 +31,10 @@ pub const MAX_RING_BYTES: usize = 512 << 20;
 
 pub fn decode_file(bytes: &[u8]) -> Result<Ring, Reject> {
     let mut raw = vec![];
+    #[cfg(not(target_arch = "wasm32"))]
     let mut dec = zstd::Decoder::new(bytes).map_err(|e| Reject::malformed("ring", e))?;
+    #[cfg(target_arch = "wasm32")]
+    let mut dec = ruzstd::decoding::StreamingDecoder::new(bytes).map_err(|e| Reject::malformed("ring", e))?;
     std::io::Read::read_to_end(&mut std::io::Read::take(&mut dec, MAX_RING_BYTES as u64 + 1), &mut raw)
         .map_err(|e| Reject::malformed("ring", e))?;
     if raw.len() > MAX_RING_BYTES {

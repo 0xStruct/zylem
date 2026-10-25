@@ -1,0 +1,5 @@
+# secp256k1-sys (through zcash_primitives) compiles C; Apple's clang has no wasm32
+# target, LLVM's does (brew install llvm).
+[env]
+CC_wasm32_unknown_unknown = "/opt/homebrew/opt/llvm/bin/clang"
+AR_wasm32_unknown_unknown = "/opt/homebrew/opt/llvm/bin/llvm-ar"

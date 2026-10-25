@@ -5,9 +5,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("cargo:rerun-if-changed={f}");
     }
     let fds = protox::compile(files, ["proto"])?;
+    let grpc = std::env::var_os("CARGO_FEATURE_GRPC").is_some();
     tonic_prost_build::configure()
-        .build_client(true)
-        .build_server(true)
+        .build_client(grpc)
+        .build_server(grpc)
         .compile_fds(fds)?;
     Ok(())
 }

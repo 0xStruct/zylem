@@ -1,0 +1,624 @@
+<title>Zcash Without a Node</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column of five steps; each step has its controls, a result, and the
+   numbers it produced. Zylem's verifier tokens, so the demo and the verifier read as one. */
+:root {
+  --paper: #f1f4ef; --paper-2: #e7ece5; --ink: #142019; --muted: #56645b; --rule: #d3dbd2;
+  --accent: #1d6b47; --accent-tint: #d4ebdc; --bad: #a3392b; --bad-tint: #f6e1dd;
+  --seg-1: #1d6b47; --seg-2: #5f9a7a; --seg-3: #a9c9b5; --seg-4: #cfdcd2;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #f08a7a; --bad-tint: #3a1d18; --seg-1: #6fd2a0; --seg-2: #3f8f68; --seg-3: #2a5c45; --seg-4: #1f3a2e; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #f08a7a; --bad-tint: #3a1d18; --seg-1: #6fd2a0; --seg-2: #3f8f68; --seg-3: #2a5c45; --seg-4: #1f3a2e; color-scheme: dark; }
+body { background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.wrap { max-width: 1000px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; line-height: 1.02; letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; font-weight: 600; }
+h3 { font-size: 1.02rem; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent); }
+.eyebrow { font: 500 0.75rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--muted); max-width: 66ch; font-size: 1.05rem; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+header.top { display: grid; gap: 12px; margin-bottom: 30px; }
+.status { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.9rem; color: var(--muted); }
+.status b { color: var(--ink); font-weight: 600; }
+.steps { display: grid; gap: 18px; }
+.step { border: 1px solid var(--rule); border-radius: 14px; padding: 20px 22px; display: grid; gap: 14px; min-width: 0; }
+.step-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-items: baseline; }
+.step-n { font: 800 1.35rem/1 var(--display); color: var(--accent); grid-row: span 2; font-variant-numeric: tabular-nums; }
+.step-head p { color: var(--muted); font-size: 0.95rem; max-width: 70ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: 600 0.9rem/1 var(--body); padding: 10px 15px; border-radius: 999px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--paper); cursor: pointer; }
+button.ghost { background: none; color: var(--accent); }
+button.danger { border-color: var(--bad); background: none; color: var(--bad); }
+button[aria-pressed="true"] { background: var(--accent); color: var(--paper); }
+button:disabled { opacity: 0.5; cursor: default; }
+button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input { font: 400 0.92rem/1.2 var(--mono); padding: 9px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); max-width: 100%; min-width: 0; }
+input.wide { width: min(100%, 44rem); }
+input.short { width: 8.5rem; }
+label { font-size: 0.88rem; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.result { border-radius: 9px; padding: 12px 14px; font-size: 0.92rem; background: var(--paper-2); min-width: 0; overflow-wrap: anywhere; }
+.result.ok { background: var(--accent-tint); }
+.result.bad { background: var(--bad-tint); }
+.result:empty { display: none; }
+.verdict { font: 600 0.76rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; margin-right: 6px; }
+.ok .verdict { color: var(--accent); }
+.bad .verdict { color: var(--bad); }
+.kv { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); gap: 4px 14px; font-size: 0.88rem; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.fact { background: var(--paper-2); border-radius: 9px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.fact b { font: 600 1.2rem/1.2 var(--display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fact span { font-size: 0.8rem; color: var(--muted); }
+.bar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; border: 1px solid var(--rule); }
+.bar div { min-width: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.84rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.strip { display: grid; gap: 6px; }
+canvas.blocks { width: 100%; height: 72px; display: block; cursor: crosshair; border-radius: 7px; background: var(--paper-2); }
+.axis { display: flex; justify-content: space-between; font: 400 0.76rem/1 var(--mono); color: var(--muted); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 9px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { font: 500 0.72rem/1.2 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--paper-2); }
+tr:last-child td { border-bottom: 0; }
+tr.mark td { background: var(--accent-tint); }
+td.mono { font-size: 0.82rem; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checks li { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); gap: 8px; font-size: 0.92rem; }
+.checks li::before { content: "·"; font: 700 1rem/1.5 var(--mono); color: var(--muted); text-align: center; }
+.checks.done li::before { content: "✓"; color: var(--accent); }
+.checks.failed li::before { content: "✗"; color: var(--bad); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 14px; }
+.card { border: 1px solid var(--rule); border-radius: 11px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.block-view { display: grid; gap: 14px; }
+.attacks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 12px; }
+.attack { border: 1px solid var(--rule); border-radius: 11px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.attack p { font-size: 0.88rem; color: var(--muted); }
+.compare td:first-child { white-space: normal; }
+.venues { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 12px; }
+.venue { background: var(--accent-tint); border-radius: 11px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.venue .big { font: 800 clamp(1.8rem, 4vw, 2.4rem)/1 var(--display); font-variant-numeric: tabular-nums; }
+.venue p:last-child { font-size: 0.92rem; }
+.trust { margin-top: 10px; padding-block: 26px 6px; border-top: 2px solid var(--ink); display: grid; gap: 16px; min-width: 0; }
+.trust-head { display: grid; gap: 8px; max-width: 72ch; }
+.trust h2 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; }
+.versus td, .versus th { white-space: normal; vertical-align: top; min-width: 9rem; }
+.versus td:first-child { color: var(--muted); min-width: 10rem; }
+.versus th:not(:first-child) { color: var(--ink); }
+.versus .yes { color: var(--accent); font-weight: 600; }
+.versus .no { color: var(--bad); font-weight: 600; }
+details { font-size: 0.9rem; }
+summary { cursor: pointer; color: var(--accent); }
+footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: grid; gap: 8px; max-width: 76ch; }
+@media (max-width: 560px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kv { grid-template-columns: minmax(0, 1fr); } .kv dd { margin-bottom: 6px; } .step { padding: 16px; } }
+@media (prefers-reduced-motion: no-preference) { .result { transition: background-color 0.2s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Zylem · Zcash testnet</p>
+    <h1>Verifiable Zcash data, no node required</h1>
+    <p class="lede">Everything on this page is a plain file from this page's host: two Rings of 4,096 blocks and two history proofs made on a GPU. Your browser checks all of it with the same Rust code a Zylem client runs, compiled to WebAssembly. The host is not trusted for any of it.</p>
+    <div class="status" id="status"><span>Loading the verifier…</span></div>
+  </header>
+
+  <div class="steps">
+    <section class="step" aria-labelledby="s1">
+      <div class="step-head"><span class="step-n">1</span><h2 id="s1">Open a Ring</h2>
+        <p>A Ring holds 4,096 consecutive blocks: every full header, every transaction in the compact form wallets already download, a few hundred bytes of digests per transaction so its ID can be rebuilt, and the tree state it starts from.</p></div>
+      <div class="controls" role="group" aria-label="Ring">
+        <button class="ghost" id="pick-payment" aria-pressed="true">Blocks 4,518,274–4,522,369</button>
+        <button class="ghost" id="pick-proven" aria-pressed="false">Blocks 4,526,466–4,530,561</button>
+        <span class="muted mono" id="ring-load"></span>
+      </div>
+      <p class="muted" id="ring-why"></p>
+      <div class="facts" id="facts"></div>
+      <div class="strip">
+        <div class="bar" id="bytes-bar" aria-label="What the Ring's bytes are"></div>
+        <div class="legend" id="bytes-legend"></div>
+      </div>
+      <div class="strip">
+        <canvas class="blocks" id="blocks" tabindex="0" aria-label="Transactions per block across the Ring. Click a block to open it."></canvas>
+        <div class="axis"><span id="axis-from"></span><span>transactions per block · click to open one</span><span id="axis-to"></span></div>
+      </div>
+      <div class="controls">
+        <label for="height">Block <input class="short" id="height" inputmode="numeric" autocomplete="off"></label>
+        <button class="ghost" id="show-block">Open block</button>
+      </div>
+      <div id="block-view" class="block-view" hidden>
+        <dl class="kv" id="block-kv"></dl>
+        <div class="table-wrap"><table><thead><tr><th>#</th><th>Transaction ID (rebuilt)</th><th>v</th><th>Transparent</th><th>Sapling</th><th>Orchard</th><th>Ironwood</th></tr></thead><tbody id="tx-rows"></tbody></table></div>
+      </div>
+      <p class="muted" id="block-note" hidden>These IDs were rebuilt here from the compact data and digests in the Ring, and together they produce this header's Merkle root. A server that changed any transaction could not make them match.</p>
+    </section>
+
+    <section class="step" aria-labelledby="s2">
+      <div class="step-head"><span class="step-n">2</span><h2 id="s2">Check the whole Ring</h2>
+        <p>The full client check, block by block. This is what lets any mirror, CDN or stranger host Rings: a client accepts nothing it cannot rebuild.</p></div>
+      <ul class="checks" id="checks">
+        <li>Every header has a valid Equihash solution, meets its own target and links to the one before; the difficulty and time rules apply once 113 earlier headers are known.</li>
+        <li>Every transaction ID is rebuilt from the compact data and digests, and the IDs reproduce each header's Merkle root.</li>
+        <li>The history tree, replayed block by block, matches what every following header commits to, which authenticates each block's tree roots.</li>
+        <li>The Ring's note commitments, appended to its starting tree state, reproduce those authenticated roots, so every tree state inside is authenticated too.</li>
+      </ul>
+      <div class="controls"><button id="verify">Check this Ring</button><span class="muted" id="verify-busy"></span></div>
+      <div class="result" id="verify-result"></div>
+    </section>
+
+    <section class="step" aria-labelledby="s3">
+      <div class="step-head"><span class="step-n">3</span><h2 id="s3">Find a payment</h2>
+        <p>Look up a transaction by its ID among the IDs rebuilt in step 2. A server can only make a payment appear if the Ring's own data rebuilds that exact ID inside an authenticated block.</p></div>
+      <div class="controls">
+        <button class="ghost" id="try-real">Try a real payment's ID</button>
+        <button class="ghost" id="try-fake">Try an ID that is not on chain</button>
+      </div>
+      <div class="controls">
+        <input class="wide" id="txid" aria-label="Transaction ID" autocomplete="off" spellcheck="false">
+        <button class="ghost" id="find">Find it</button>
+      </div>
+      <div class="result" id="find-result"></div>
+    </section>
+
+    <section class="step" aria-labelledby="s4">
+      <div class="step-head"><span class="step-n">4</span><h2 id="s4">Try to lie</h2>
+        <p>Each button makes a copy of the open Ring altered the way a dishonest server would, then runs the step 2 check on it. The server would also publish a matching file hash, so only verification can catch it. The target follows the block opened in step 1; any transaction works.</p></div>
+      <div class="controls">
+        <label for="atk-height">At block <input class="short" id="atk-height" inputmode="numeric" autocomplete="off"></label>
+        <label for="atk-tx">transaction <input class="short" id="atk-tx" inputmode="numeric" autocomplete="off" placeholder="first Ironwood"></label>
+      </div>
+      <div class="attacks">
+        <div class="attack"><h3>Invent an incoming note</h3><p>Adds a fake Ironwood action, as if someone had paid the wallet.</p><button class="danger" data-attack="inject">Add a fake note</button><div class="result" id="atk-inject"></div></div>
+        <div class="attack"><h3>Hide a payment</h3><p>Leaves one transaction out of its block, so the wallet never sees it.</p><button class="danger" data-attack="hide">Hide the transaction</button><div class="result" id="atk-hide"></div></div>
+        <div class="attack"><h3>Serve a wrong tree state</h3><p>Swaps the starting Ironwood tree for another of the same size, so a wallet would build unspendable anchors.</p><button class="danger" data-attack="tree">Swap the tree state</button><div class="result" id="atk-tree"></div></div>
+      </div>
+    </section>
+
+    <section class="step" aria-labelledby="s5">
+      <div class="step-head"><span class="step-n">5</span><h2 id="s5">Verify succinct proof on mobile and on-chain</h2>
+        <p>A succinct proof of Zcash data stays small and quick to check however many blocks it covers. One SP1 proof states that every header in a range passed Equihash, its target and the difficulty rules, and commits to a 104-byte record of each block. The same claim comes in two forms: one a phone checks, and one a smart contract checks.</p></div>
+      <div class="venues">
+        <div class="venue">
+          <p class="eyebrow">On mobile</p>
+          <b class="big">1.27 MB</b>
+          <p>A compressed STARK, with no trusted setup. It verifies in this browser in <b class="mono" id="v-mobile">a few dozen ms</b> on whatever device opened this page, then stands in for every header it covers.</p>
+        </div>
+        <div class="venue">
+          <p class="eyebrow">On-chain</p>
+          <b class="big">356 bytes</b>
+          <p>The same claim wrapped in Groth16 over BN254, the form SP1's verifier contracts check on EVM chains. It verifies here in <b class="mono" id="v-chain">a few hundred ms</b>. No contract is deployed yet.</p>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>On mobile: check the STARK proofs</h3>
+          <p class="muted" id="smoke-desc"></p>
+          <div class="controls"><button id="smoke-verify">Verify the proof</button><button class="ghost" id="smoke-bind">Match the Ring to it</button></div>
+          <div class="result" id="smoke-result"></div>
+          <div class="result" id="bind-result"></div>
+          <p class="muted" id="shard-desc"></p>
+          <div class="controls"><button class="ghost" id="shard-verify">Verify the NU7 proof</button></div>
+          <div class="result" id="shard-result"></div>
+          <div class="controls"><label for="rec-height">Block <input class="short" id="rec-height" inputmode="numeric" autocomplete="off"></label><button class="ghost" id="rec-show">Show its proven record</button></div>
+          <div class="result" id="rec-result"></div>
+        </div>
+        <div class="card">
+          <h3>On-chain: check the 356-byte proof</h3>
+          <p class="muted">A contract that accepts this proof learns, from the proof alone, the Zcash block hash at the top of the range, the total work behind it and a commitment to every block's record. Bridges and other chains can build on that without running a Zcash node.</p>
+          <div class="controls"><button id="smoke-groth">Verify the 356-byte proof</button></div>
+          <div class="result" id="groth-result"></div>
+        </div>
+      </div>
+      <div class="table-wrap"><table class="compare"><thead><tr><th>Same blocks, two ways</th><th>Check every header</th><th>Check the proof</th></tr></thead><tbody id="compare"></tbody></table></div>
+    </section>
+
+    <section class="trust" aria-labelledby="s6">
+      <div class="trust-head">
+        <p class="eyebrow">Light wallet vs Zylem</p>
+        <h2 id="s6">Don't trust, verify</h2>
+        <p class="muted">Today's Zcash light wallets download compact blocks from a light-wallet server and take them as given. Zylem gives the same wallets data they can check. Steps 2 to 5 above are the checks in the Zylem columns, run on this page.</p>
+      </div>
+      <div class="table-wrap"><table class="versus">
+        <thead><tr><th></th><th>Light wallet today</th><th>Zylem, full Rings</th><th>Zylem, Rings with a proof</th></tr></thead>
+        <tbody>
+          <tr><td>Who you trust for balances and payments</td><td><span class="no">The light-wallet server</span></td><td><span class="yes">No one: your device checks</span></td><td><span class="yes">No one for the contents</span>; SP1 and two pinned programs for the headers</td></tr>
+          <tr><td>Proof of work and difficulty</td><td><span class="no">Not checked</span></td><td><span class="yes">Every header</span></td><td><span class="yes">Every header, inside the proof</span></td></tr>
+          <tr><td>Transaction IDs</td><td><span class="no">Not rebuilt</span>; compact data alone cannot rebuild them</td><td><span class="yes">Rebuilt and matched to the Merkle root</span></td><td><span class="yes">Rebuilt and matched to the proven Merkle root</span></td></tr>
+          <tr><td>A fake incoming payment</td><td><span class="no">Shown as received</span></td><td><span class="yes">Refused</span> (step 4)</td><td><span class="yes">Refused</span></td></tr>
+          <tr><td>A hidden payment</td><td><span class="no">Missed without a sign</span></td><td><span class="yes">Refused</span> (step 4)</td><td><span class="yes">Refused</span></td></tr>
+          <tr><td>A wrong tree state</td><td><span class="no">Used; spends fail later</span></td><td><span class="yes">Refused</span> (step 4)</td><td><span class="yes">Refused</span></td></tr>
+          <tr><td>Who can serve the data</td><td>A server you trust</td><td>Any host or mirror</td><td>Any host or mirror</td></tr>
+          <tr><td>Download per 4,096 blocks</td><td class="mono" id="vs-light">compact data only</td><td class="mono" id="vs-full"></td><td class="mono" id="vs-proof"></td></tr>
+          <tr><td>Runs on a phone</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>Works with today's wallet apps</td><td>Yes</td><td>Yes, by pointing them at zylem-proxy</td><td>Not yet: light Rings are measured, not shipped</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <footer>
+    <p><b>What this page trusts.</b> For a Ring on its own, nothing but the cryptography: it proves its own contents from its starting state, and a wallet links Rings to a checkpoint block it ships with. For the proofs, SP1 and Zylem's two proving programs, whose keys this page pins, plus the starting block each proof is anchored to.</p>
+    <details><summary>Pinned keys and starting blocks</summary><dl class="kv" id="trust-kv"></dl></details>
+    <p>Rings are rebuilt from a pruned testnet node, which keeps full blocks only for its last few weeks, so the NU7 proof's range has no Ring here; its block records are shown instead.</p>
+  </footer>
+</div>
+
+<script type="module">
+import init, * as zv from "./pkg/zylem_wasm_verify.js";
+
+const FILES = /*FILES*/null;
+const TRUST = /*TRUST*/null;
+const DEMO = { height: 4521980, tx: 4, txid: "0f662f85a79320141bd58f7515b5d96955554c181fb6ed7c2fba6c00991a64eb" };
+const HEADER_BYTES = 1487, RECORD_BYTES = 104;
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Number(n).toLocaleString("en-US");
+const mb = (b) => (b / 1e6).toFixed(b < 1e7 ? 2 : 1) + " MB";
+const ms = (t) => (t < 10 ? t.toFixed(1) : Math.round(t).toLocaleString("en-US")) + " ms";
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const tick = () => new Promise((r) => setTimeout(r, 30));
+const hexToBytes = (h) => new Uint8Array(h.match(/../g).map((b) => parseInt(b, 16)));
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const cache = new Map();
+async function fetchBytes(path) {
+  if (cache.has(path)) return cache.get(path);
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  let bytes;
+  if (path.endsWith(".b64.txt")) {
+    const s = atob((await res.text()).trim());
+    bytes = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+  } else bytes = new Uint8Array(await res.arrayBuffer());
+  cache.set(path, bytes);
+  return bytes;
+}
+
+function show(el, ok, title, detail) {
+  el.className = "result " + (ok ? "ok" : "bad");
+  el.innerHTML = `<span class="verdict">${ok ? "Verified" : "Refused"}</span>${title}${detail ? `<div style="margin-top:6px">${detail}</div>` : ""}`;
+}
+function info(el, html) { el.className = "result"; el.innerHTML = html; }
+function kv(rows) { return `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`; }
+function timed(f) {
+  const t = performance.now();
+  try { return { ok: true, value: f(), ms: performance.now() - t }; }
+  catch (e) { return { ok: false, error: e.message || String(e), ms: performance.now() - t }; }
+}
+async function busy(btn, f) { btn.disabled = true; await tick(); try { return await f(); } finally { btn.disabled = false; } }
+
+// Rings ---------------------------------------------------------------------------------
+const rings = {};
+let current = null, currentKey = "payment", selected = null, verified = new Set();
+
+async function openRing(key) {
+  if (rings[key]) return rings[key];
+  const f = FILES.rings[key];
+  $("ring-load").textContent = `downloading ${mb(f.bytes)}…`;
+  const t0 = performance.now();
+  const bytes = await fetchBytes(f.file);
+  const t1 = performance.now();
+  const ring = new zv.RingFile(bytes);
+  const t2 = performance.now();
+  rings[key] = { ring, summary: JSON.parse(ring.summary()), blocks: JSON.parse(ring.blocks()), fetchMs: t1 - t0, openMs: t2 - t1 };
+  return rings[key];
+}
+
+async function pick(key) {
+  currentKey = key;
+  for (const k of ["payment", "proven"]) $("pick-" + k).setAttribute("aria-pressed", String(k === key));
+  current = await openRing(key);
+  const s = current.summary;
+  $("ring-load").textContent = `${mb(s.bytes.file)} file · fetched in ${ms(current.fetchMs)} · decoded in ${ms(current.openMs)}`;
+  $("ring-why").textContent = key === "payment"
+    ? "This Ring holds the example payment used in steps 3 and 4: block 4,521,980, transaction 4."
+    : "Blocks 4,527,490–4,529,025 of this Ring are covered by the GPU proof in step 5.";
+  const shielded = s.sapling.spends + s.sapling.outputs + s.orchard_actions + s.ironwood_actions;
+  $("facts").innerHTML = [
+    [`${fmt(s.start_height)}–${fmt(s.end_height)}`, "heights"],
+    [fmt(s.blocks), "blocks"],
+    [fmt(s.transactions), "transactions"],
+    [fmt(s.ironwood_actions), "Ironwood actions"],
+    [fmt(shielded - s.ironwood_actions), "Sapling and Orchard parts"],
+    [fmt(s.transparent.inputs + s.transparent.outputs), "transparent ins and outs"],
+  ].map(([b, t]) => `<div class="fact"><b>${b}</b><span>${t}</span></div>`).join("");
+  drawBytes(s.bytes);
+  drawBlocks();
+  const h = key === "payment" ? DEMO.height : busiest().height;
+  $("height").value = h;
+  showBlock(h);
+  $("verify-result").className = "result";
+  $("verify-result").innerHTML = verified.has(key) ? "Checked earlier on this page. Run it again to time it." : "";
+  $("checks").className = verified.has(key) ? "checks done" : "checks";
+  for (const a of ["inject", "hide", "tree"]) $("atk-" + a).innerHTML = "";
+  $("find-result").innerHTML = "";
+}
+
+function drawBytes(b) {
+  const other = Math.max(0, b.decompressed - b.headers - b.compact_blocks - b.aux);
+  const parts = [["Full headers", b.headers, "--seg-1"], ["Compact transactions", b.compact_blocks, "--seg-2"], ["Digests to rebuild IDs", b.aux, "--seg-3"], ["Tree roots and start state", other, "--seg-4"]];
+  $("bytes-bar").innerHTML = parts.map(([n, v, c]) => `<div title="${n}: ${mb(v)}" style="flex:${v} 0 0; background:var(${c})"></div>`).join("");
+  $("bytes-legend").innerHTML = parts.map(([n, v, c]) => `<span><i style="background:var(${c})"></i>${n} <b class="mono">${(100 * v / b.decompressed).toFixed(0)}%</b> <span class="mono">${mb(v)}</span></span>`).join("") +
+    `<span>decompressed ${mb(b.decompressed)}, stored as ${mb(b.file)}</span>` +
+    (FILES.rings[currentKey].light_bytes ? `<span>with a proof, as a light Ring: <b class="mono">${mb(FILES.rings[currentKey].light_bytes)}</b> (step 5)</span>` : "");
+}
+
+function busiest() {
+  let best = current.blocks[0];
+  for (const b of current.blocks) if (b[3] > best[3]) best = b;
+  return { height: best[0], txs: best[3] };
+}
+
+function drawBlocks() {
+  const c = $("blocks"), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  const g = c.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const blocks = current.blocks, n = blocks.length;
+  const cols = Math.max(1, Math.floor(w));
+  const per = n / cols;
+  let max = 1;
+  const vals = [];
+  for (let x = 0; x < cols; x++) {
+    let m = 0;
+    for (let i = Math.floor(x * per); i < Math.min(n, Math.floor((x + 1) * per) || 1); i++) m = Math.max(m, blocks[i][3]);
+    vals.push(m); max = Math.max(max, m);
+  }
+  const scale = (v) => Math.max(1, Math.sqrt(v / max) * (h - 8));
+  g.fillStyle = css("--seg-2");
+  vals.forEach((v, x) => { const bh = scale(v); g.fillRect(x, h - bh, 1, bh); });
+  if (selected != null) {
+    const x = Math.floor((selected - current.summary.start_height) / per);
+    g.fillStyle = css("--bad");
+    g.fillRect(Math.max(0, x - 1), 0, 2, h);
+  }
+  $("axis-from").textContent = fmt(current.summary.start_height);
+  $("axis-to").textContent = fmt(current.summary.end_height);
+}
+
+$("blocks").addEventListener("click", (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const per = current.blocks.length / Math.max(1, Math.floor(r.width));
+  const x = Math.floor(e.clientX - r.left);
+  const from = Math.floor(x * per), to = Math.min(current.blocks.length, Math.max(from + 1, Math.floor((x + 1) * per)));
+  let best = current.blocks[from];
+  for (let i = from; i < to; i++) if (current.blocks[i][3] > best[3]) best = current.blocks[i];
+  $("height").value = best[0];
+  showBlock(best[0]);
+});
+window.addEventListener("resize", () => current && drawBlocks());
+
+function showBlock(height) {
+  const r = timed(() => JSON.parse(current.ring.block(Number(height))));
+  if (!r.ok) { $("block-view").hidden = true; $("block-note").hidden = false; $("block-note").textContent = r.error; return; }
+  selected = Number(height);
+  drawBlocks();
+  const b = r.value;
+  $("block-kv").innerHTML = [
+    ["Height", fmt(b.height)], ["Block hash", b.hash], ["Previous", b.prev_hash], ["Merkle root", b.merkle_root],
+    ["Block commitments", b.block_commitments], ["Time", new Date(b.time * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC"],
+    ["Difficulty bits", b.bits], ["Ironwood root after", b.roots_after.ironwood], ["IDs rebuilt", `${b.transactions.length} in ${ms(r.ms)}, Merkle root matches`],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  const cell = (n, extra) => (n ? fmt(n) + (extra || "") : "<span class='muted'>–</span>");
+  $("tx-rows").innerHTML = b.transactions.map((t) => {
+    const mark = currentKey === "payment" && b.height === DEMO.height && t.index === DEMO.tx;
+    const io = t.transparent.inputs || t.transparent.outputs ? `${t.transparent.inputs} in / ${t.transparent.outputs} out` : "<span class='muted'>–</span>";
+    const sap = t.sapling.spends || t.sapling.outputs ? `${t.sapling.spends} / ${t.sapling.outputs}` : "<span class='muted'>–</span>";
+    return `<tr${mark ? ' class="mark"' : ""}><td>${t.index}</td><td class="mono" title="${t.txid}">${t.txid.slice(0, 20)}…</td><td>${t.version}</td><td>${io}</td><td>${sap}</td><td>${cell(t.orchard.actions)}</td><td>${cell(t.ironwood.actions)}</td></tr>`;
+  }).join("");
+  // Step 4 attacks the block on screen: its first transaction with Ironwood actions.
+  const iw = currentKey === "payment" && b.height === DEMO.height ? b.transactions[DEMO.tx] : b.transactions.find((t) => t.ironwood.actions > 0);
+  $("atk-height").value = b.height;
+  $("atk-tx").value = iw ? iw.index : "";
+  $("block-view").hidden = false;
+  $("block-note").hidden = false;
+  $("block-note").textContent = "These IDs were rebuilt here from the compact data and digests in the Ring, and together they produce this header's Merkle root. A server that changed any transaction could not make them match.";
+}
+function alertIn(el, msg) { el.className = "result bad"; el.innerHTML = `<span class="verdict">Error</span>${esc(msg)}`; }
+
+$("show-block").addEventListener("click", () => showBlock($("height").value));
+$("height").addEventListener("keydown", (e) => e.key === "Enter" && showBlock($("height").value));
+$("pick-payment").addEventListener("click", () => busy($("pick-payment"), () => pick("payment")));
+$("pick-proven").addEventListener("click", () => busy($("pick-proven"), () => pick("proven")));
+
+// Step 2 ---------------------------------------------------------------------------------
+async function verifyRing() {
+  $("checks").className = "checks";
+  $("verify-busy").textContent = `checking ${fmt(current.summary.blocks)} blocks…`;
+  await tick();
+  const r = timed(() => JSON.parse(current.ring.verify()));
+  $("verify-busy").textContent = "";
+  if (r.ok) {
+    verified.add(currentKey);
+    $("checks").className = "checks done";
+    const v = r.value;
+    show($("verify-result"), true, `all ${fmt(v.blocks)} blocks and ${fmt(v.transactions)} transactions, in ${ms(r.ms)} in this browser`, kv([
+      ["Heights", `${fmt(v.start_height)} to ${fmt(v.end_height)}`],
+      ["Difficulty rules checked from", v.difficulty_checked_from ? fmt(v.difficulty_checked_from) : "not reached"],
+      ["Tree roots authenticated to", fmt(v.authenticated_to)],
+      ["Total work", "0x" + v.work.replace(/^0+/, "")],
+      ["Last block", v.last_hash],
+    ]));
+  } else {
+    $("checks").className = "checks failed";
+    show($("verify-result"), false, `after ${ms(r.ms)}`, `<span class="mono">${esc(r.error)}</span>`);
+  }
+  return r.ok;
+}
+$("verify").addEventListener("click", () => busy($("verify"), verifyRing));
+
+// Step 3 ---------------------------------------------------------------------------------
+$("find").addEventListener("click", () => busy($("find"), async () => {
+  if (!verified.has(currentKey) && !(await verifyRing())) return;
+  const id = $("txid").value.trim().toLowerCase();
+  const r = timed(() => JSON.parse(current.ring.find_tx(id)));
+  if (!r.ok) {
+    $("find-result").className = "result bad";
+    $("find-result").innerHTML = `<span class="verdict">Not found</span>No transaction in blocks ${fmt(current.summary.start_height)}–${fmt(current.summary.end_height)} has this ID. All ${fmt(current.summary.transactions)} IDs here were rebuilt from the Ring's own data, so a server cannot make a payment appear that is not in an authenticated block.` +
+      (currentKey === "payment" ? "" : `<div class="muted" style="margin-top:6px">The example payment is in blocks 4,518,274–4,522,369.</div>`);
+    return;
+  }
+  const b = JSON.parse(current.ring.block(r.value.height));
+  const t = b.transactions[r.value.index];
+  $("height").value = r.value.height; showBlock(r.value.height);
+  show($("find-result"), true, `transaction ${r.value.index} of ${r.value.of} in block ${fmt(r.value.height)}`, kv([
+    ["Its ID", t.txid],
+    ["Rebuilt from", `${fmt(t.compact_bytes)} bytes of compact data and ${fmt(t.aux_bytes)} bytes of digests`],
+    ["Moves", [t.transparent.inputs && `${t.transparent.inputs} transparent input`, t.ironwood.actions && `${t.ironwood.actions} Ironwood actions`, t.sapling.outputs && `${t.sapling.outputs} Sapling outputs`].filter(Boolean).join(", ")],
+    ["Into the shielded pool", t.ironwood.value_balance != null ? `${(-t.ironwood.value_balance / 1e8).toFixed(8)} TAZ (Ironwood value balance)` : "–"],
+    ["In the Merkle root of", `block ${b.hash}`],
+    ["Which is authenticated by", "its Equihash and the chain of headers checked in step 2"],
+  ]));
+}));
+
+const fakeId = () => DEMO.txid.slice(0, -1) + (DEMO.txid.endsWith("b") ? "c" : "b");
+$("try-real").addEventListener("click", () => busy($("try-real"), async () => {
+  if (currentKey !== "payment") await pick("payment");
+  $("txid").value = DEMO.txid;
+  $("find").click();
+}));
+$("try-fake").addEventListener("click", () => busy($("try-fake"), async () => {
+  $("txid").value = fakeId();
+  $("find").click();
+}));
+
+// Step 4 ---------------------------------------------------------------------------------
+document.querySelectorAll("[data-attack]").forEach((btn) => btn.addEventListener("click", () => busy(btn, async () => {
+  const a = btn.dataset.attack, el = $("atk-" + a);
+  const h = Number($("atk-height").value), txv = $("atk-tx").value.trim();
+  info(el, "altering a copy and checking it…");
+  await tick();
+  let bad;
+  try { bad = current.ring.attacked(a, a === "tree" ? current.summary.start_height : h, a === "tree" || txv === "" ? undefined : Number(txv)); }
+  catch (e) { return alertIn(el, e.message || String(e)); }
+  const what = bad.altered || "";
+  const r = timed(() => bad.verify());
+  bad.free();
+  if (r.ok) { el.className = "result bad"; el.innerHTML = `<span class="verdict">Accepted</span>${esc(what)}. This should never happen.`; }
+  else { el.className = "result ok"; el.innerHTML = `<span class="verdict">Caught</span>${esc(r.error)}<div class="muted" style="margin-top:6px">The copy ${esc(what)}; refused in ${ms(r.ms)}.</div>`; }
+})));
+
+// Step 5 ---------------------------------------------------------------------------------
+const P = TRUST.programs;
+const trustedFor = (key) => JSON.stringify({ leaf_vk: P.leaf_vk, agg_vk: P.agg_vk, anchor: { height: TRUST[key].anchor.height, hash: TRUST[key].anchor.hash, context_hash: TRUST[key].anchor.context_hash } });
+async function proofParts(key) {
+  const f = FILES.proofs[key];
+  const [proof, pv] = await Promise.all([fetchBytes(f.proof), fetchBytes(f.public_values)]);
+  return { f, proof, pv };
+}
+async function verifyProof(key, el) {
+  const { f, proof, pv } = await proofParts(key);
+  const r = timed(() => JSON.parse(zv.verify_history(proof, pv, hexToBytes(P.agg_vk_bincode), trustedFor(key))));
+  if (r.ok) show(el, true, `${fmt(r.value.first_height)}–${fmt(r.value.last_height)}, ${fmt(r.value.last_height - r.value.first_height + 1)} headers, in ${ms(r.ms)}`, kv([
+    ["Leaves joined", `${r.value.leaves} leaves of 512 headers`], ["Equihash", r.value.equihash_checked ? "checked for every header" : "not checked"],
+    ["Starts after block", `${fmt(TRUST[key].anchor.height)} · ${TRUST[key].anchor.display}`], ["Proof size", `${fmt(proof.length)} bytes`],
+  ]));
+  else show(el, false, `after ${ms(r.ms)}`, `<span class="mono">${esc(r.error)}</span>`);
+  return r;
+}
+const timesFor = {};
+$("smoke-verify").addEventListener("click", () => busy($("smoke-verify"), async () => { const r = await verifyProof("smoke", $("smoke-result")); if (r.ok) { timesFor.proof = r.ms; $("v-mobile").textContent = ms(r.ms); renderCompare(); } }));
+$("shard-verify").addEventListener("click", () => busy($("shard-verify"), async () => { const r = await verifyProof("shard0", $("shard-result")); if (r.ok) $("v-mobile").textContent = ms(r.ms); }));
+$("smoke-bind").addEventListener("click", () => busy($("smoke-bind"), async () => {
+  const f = FILES.proofs.smoke;
+  const { pv } = await proofParts("smoke");
+  const proven = await openRing("proven");
+  const recs = timed(() => proven.ring.records(f.from, f.to));
+  const m = timed(() => JSON.parse(zv.check_all_records(pv, recs.value)));
+  const hdr = timed(() => proven.ring.check_headers(f.from, f.to));
+  timesFor.headers = hdr.ms; timesFor.match = recs.ms + m.ms; renderCompare();
+  if (m.ok) show($("bind-result"), true, `the Ring's blocks ${fmt(f.from)}–${fmt(f.to)} are exactly the ones the proof commits to, in ${ms(recs.ms + m.ms)}`,
+    `Checking those ${fmt(f.to - f.from + 1)} headers' Equihash and links directly instead took ${ms(hdr.ms)} here.`);
+  else show($("bind-result"), false, "", `<span class="mono">${esc(m.error)}</span>`);
+}));
+$("smoke-groth").addEventListener("click", () => busy($("smoke-groth"), async () => {
+  const f = FILES.proofs.smoke;
+  const [g, pv] = await Promise.all([fetchBytes(f.groth16), fetchBytes(f.public_values)]);
+  const r = timed(() => zv.verify_groth16(g, pv, P.agg_bytes32));
+  if (r.ok) {
+    $("v-chain").textContent = ms(r.ms);
+    const { proof } = await proofParts("smoke");
+    const c = JSON.parse(zv.verify_history(proof, pv, hexToBytes(P.agg_vk_bincode), trustedFor("smoke")));
+    show($("groth-result"), true, `${fmt(g.length)} bytes, in ${ms(r.ms)}`, kv([
+      ["A contract learns", `blocks ${fmt(c.first_height)}–${fmt(c.last_height)} are valid Zcash blocks`],
+      ["Top block hash", c.last_hash.match(/../g).reverse().join("")],
+      ["Total work", "0x" + c.work.replace(/^0+/, "")],
+      ["Equihash", c.equihash_checked ? "checked for every header" : "not checked"],
+      ["Program key it checks against", P.agg_bytes32],
+    ]) + `<div class="muted" style="margin-top:6px">Wallets use the 1.27 MB form instead: it needs no trusted setup and verifies faster off-chain.</div>`);
+  }
+  else show($("groth-result"), false, "", `<span class="mono">${esc(r.error)}</span>`);
+}));
+$("rec-show").addEventListener("click", () => busy($("rec-show"), async () => {
+  const f = FILES.proofs.shard0, h = Number($("rec-height").value);
+  const [pv, rec] = await Promise.all([fetchBytes(f.public_values), fetchBytes(f.records)]);
+  const r = timed(() => JSON.parse(zv.check_range(pv, rec, h, h)));
+  if (!r.ok) return show($("rec-result"), false, esc(r.error));
+  const x = r.value.first_record;
+  show($("rec-result"), true, `block ${fmt(h)}, matched to the proof with ${r.value.sibling_hashes} sibling hashes in ${ms(r.ms)}`, kv([
+    ["Block hash", x.hash], ["Merkle root", x.merkle_root], ["Block commitments", x.block_commitments],
+    ["Time", new Date(x.time * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC"], ["Difficulty bits", x.bits],
+  ]));
+}));
+
+function renderVersus() {
+  const r = FILES.rings.payment;
+  $("vs-full").textContent = `${mb(r.bytes)} Ring`;
+  $("vs-proof").textContent = `${mb(r.light_bytes)} light Ring + a share of one ${mb(cache.get(FILES.proofs.smoke.proof)?.length ?? 1272546)} proof`;
+  if (current) $("vs-light").textContent = `about ${mb(current.summary.bytes.compact_blocks)} of compact blocks`;
+}
+
+function renderCompare() {
+  const f = FILES.proofs.smoke, n = f.to - f.from + 1;
+  const proofBytes = cache.get(f.proof)?.length ?? 1272546;
+  const s = FILES.proofs.shard0, n0 = s.to - s.from + 1;
+  const t = (v) => (v == null ? "<span class='muted'>run step 5</span>" : ms(v));
+  $("compare").innerHTML = [
+    [`Download for ${fmt(n)} blocks`, mb(n * HEADER_BYTES) + " of headers", `${mb(proofBytes)} proof + ${mb(n * RECORD_BYTES)} of records`],
+    [`Time for ${fmt(n)} blocks, this browser`, t(timesFor.headers), timesFor.proof == null ? t(null) : `${ms(timesFor.proof)} for the proof + ${ms(timesFor.match ?? 0)} to match the Ring`],
+    ["One Ring of 4,096 blocks", mb(FILES.rings.payment.bytes) + " (full headers)", `${mb(FILES.rings.payment.light_bytes)} with records instead of headers, plus one proof shared by every Ring it covers`],
+    [`Download for ${fmt(n0)} blocks (NU7 proof)`, mb(n0 * HEADER_BYTES) + " of headers", `${mb(proofBytes)} proof + ${mb(n0 * RECORD_BYTES)} of records`],
+    ["Trusts", "the cryptography and a checkpoint", "also SP1 and the two pinned programs"],
+  ].map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("");
+}
+
+// Start -----------------------------------------------------------------------------------
+async function main() {
+  try {
+    await init({ module_or_path: "./pkg/zylem_wasm_verify_bg.wasm" });
+    const s = FILES.proofs.smoke, z = FILES.proofs.shard0;
+    $("smoke-desc").textContent = `${fmt(s.to - s.from + 1)} headers, ${fmt(s.from)}–${fmt(s.to)}, proved as ${s.leaves} leaves of 512 on an RTX 5090, with Equihash. They sit inside the second Ring.`;
+    $("shard-desc").textContent = `${fmt(z.to - z.from + 1)} headers, ${fmt(z.from)}–${fmt(z.to)}, the first ${z.leaves} leaves after NU7 activated, joined into one proof.`;
+    $("rec-height").value = z.from + 4321;
+    $("txid").value = DEMO.txid;
+    $("trust-kv").innerHTML = [
+      ["Leaf program", P.leaf_bytes32], ["Aggregation program", P.agg_bytes32],
+      ["NU7 proof starts after", `${fmt(TRUST.shard0.anchor.height)} · ${TRUST.shard0.anchor.display}`],
+      ["Newest-blocks proof starts after", `${fmt(TRUST.smoke.anchor.height)} · ${TRUST.smoke.anchor.display}`],
+    ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    renderCompare();
+    await pick("payment");
+    renderVersus();
+    $("status").innerHTML = `<span>Verifier <b>${mb(FILES.wasm_bytes)}</b> of WebAssembly</span><span>Rings <b>2 × 4,096 blocks</b></span><span>Proofs <b>2</b>, made on an RTX 5090</span><span>Network <b>Zcash testnet</b>, NU7 and Ironwood</span>`;
+  } catch (e) {
+    $("status").innerHTML = `<span class="mono">Could not start: ${esc(e.message || e)}</span>`;
+  }
+}
+main();
+</script>

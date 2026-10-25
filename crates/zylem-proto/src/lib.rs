@@ -1,5 +1,5 @@
-//! Light-wallet protocol types (ZIP 307) with client and server stubs, and the Zylem
-//! Ring format.
+//! Light-wallet protocol types (ZIP 307) with client and server stubs (feature `grpc`),
+//! and the Zylem Ring format.
 
 // The module tree mirrors the proto packages, because generated code refers to
 // other packages by relative path.
@@ -9,7 +9,7 @@ pub mod cash {
         pub mod wallet {
             pub mod sdk {
                 pub mod rpc {
-                    tonic::include_proto!("cash.z.wallet.sdk.rpc");
+                    include!(concat!(env!("OUT_DIR"), "/cash.z.wallet.sdk.rpc.rs"));
                 }
             }
         }
@@ -19,7 +19,7 @@ pub mod cash {
 #[allow(clippy::all)]
 pub mod zylem {
     pub mod v1 {
-        tonic::include_proto!("zylem.v1");
+        include!(concat!(env!("OUT_DIR"), "/zylem.v1.rs"));
     }
 }
 

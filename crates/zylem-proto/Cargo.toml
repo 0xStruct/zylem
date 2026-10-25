@@ -7,10 +7,16 @@ rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+default = ["grpc"]
+# Client and server stubs for the light-wallet service. Off for WebAssembly, which needs
+# only the message types.
+grpc = ["dep:tonic", "dep:tonic-prost"]
+
 [dependencies]
 prost.workspace = true
-tonic.workspace = true
-tonic-prost.workspace = true
+tonic = { workspace = true, optional = true }
+tonic-prost = { workspace = true, optional = true }
 
 [build-dependencies]
 protox = "0.9"
