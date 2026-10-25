@@ -542,7 +542,7 @@ details.menu, details.menu[open] { border: 0; padding: 0; background: none; }
       </div>
       <div class="pillar">
         <div class="pillar-top"><h3>Connect</h3><span class="chip next">Tested locally</span></div>
-        <p>Bring verified Zcash facts into other applications and other chains, through a wrapped history proof and inclusion evidence. SP1's verifier contract already accepts Zylem's 356-byte proof in a local EVM for about 304,000 gas; nothing is deployed on a chain yet.</p>
+        <p>Bring verified Zcash facts into other applications and other chains, through a wrapped history proof and inclusion evidence. SP1's verifier contract already accepts Zylem's 356-byte proof in a local EVM for about 225,000 gas; nothing is deployed on a chain yet.</p>
       </div>
     </div>
   </section>
@@ -615,7 +615,7 @@ details.menu, details.menu[open] { border: 0; padding: 0; background: none; }
         <div class="mode-top"><h3>Light Rings + history proof</h3><span class="chip on">Working on testnet</span></div>
         <p>Rings carry 104-byte block records instead of headers, and one SP1 proof shows every header followed Zcash's rules, Equihash included. The client checks the proof, then the records against it; transactions and note trees are checked as in a full Ring.</p>
         <ul>
-          <li>On testnet: a Ring with its 1,536 proven blocks light drops from 7.19 MB to 5.10 MB and verifies in the browser (<a href="/demo/#s5">demo, step 5</a>). With every block proven, a Ring is about 2 MB</li>
+          <li>On testnet: two Rings, each with its own proof, drop from 7.59 and 7.19 MB to 2.03 and 1.63 MB and verify in the browser (<a href="/demo/#s5">demo, step 5</a>)</li>
           <li>One proof of about 0.8 MB instead of about 2.7 GB of headers for mainnet since NU5</li>
           <li>One check in about 40 ms instead of 1.84 million Equihash checks</li>
           <li>Jump straight to any Ring; the proof can start at genesis at no cost to clients</li>
@@ -698,13 +698,13 @@ WARN zylem_proxy: serving only the verified range up to 4518273</pre>
       <li><span class="pill done">Done</span><div>Verifying transactions, tree states and headers from Rings<small>An unmodified zcash-devtool wallet syncs through the proxy; the attacks above are rejected.</small></div></li>
       <li><span class="pill done">Done</span><div>The full header rules, matched against Zakura<small>1.55M testnet headers from NU6 across NU7, 400,000 random cases, 46,542 transaction IDs.</small></div></li>
       <li><span class="pill done">Done</span><div>Tip policy<small>Minimum chain work, several sources, a two-hour future limit and a stale-tip alarm.</small></div></li>
-      <li><span class="pill done">Done</span><div>Header proofs on testnet<small>17,920 headers proved with Equihash on an RTX 5090, from NU7 activation and a recent range. Proving the rest of the NU7 range is next.</small></div></li>
+      <li><span class="pill done">Done</span><div>Header proofs on testnet<small>24,576 headers proved with Equihash on an RTX 5090, in three proofs: the first 16,384 blocks after NU7 activation and two whole recent Rings. Proving the rest of the NU7 range is next.</small></div></li>
       <li><span class="pill done">Done</span><div>Light Rings<small>Proven blocks carry 104-byte records instead of headers. <span class="mono">zylem-build light</span> makes them from a published proof, and the client checks them against it, natively and in WebAssembly. The proxy reads only full Rings so far.</small></div></li>
       <li><span class="pill done">Done</span><div>Verification in the browser<small>The full Ring check and the proof verifier in WebAssembly: 4,096 blocks in about 2.5 s, a history proof in about 50 ms. <a href="/demo/">Try it</a>.</small></div></li>
       <li><span class="pill next">Next</span><div>Verified range queries and inclusion receipts<small>Reusable primitives for wallets, payment processors, agents and watchers.</small></div></li>
       <li><span class="pill later">Planned</span><div>Mainnet from NU5<small>Rings and proofs for every block since NU5, kept current as new blocks arrive.</small></div></li>
       <li><span class="pill later">Planned</span><div>Verification inside wallets<small>A verifying block source for wallet SDKs, and private queries over OHTTP.</small></div></li>
-      <li><span class="pill done">Tested</span><div>Zcash facts on other chains<small>SP1's verifier contract accepts Zylem's 356-byte history proof in a local EVM for about 304,000 gas, and an example contract stores the proven Zcash block hash. Nothing is deployed on a chain yet; a freshness rule and transaction inclusion paths come next.</small></div></li>
+      <li><span class="pill done">Tested</span><div>Zcash facts on other chains<small>SP1's verifier contract accepts Zylem's 356-byte history proof in a local EVM for about 225,000 gas, and an example contract stores the proven Zcash block hash. Nothing is deployed on a chain yet; a freshness rule and transaction inclusion paths come next.</small></div></li>
     </ul>
   </section>
 

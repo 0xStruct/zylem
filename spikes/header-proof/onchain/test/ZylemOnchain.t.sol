@@ -42,8 +42,10 @@ contract ZylemOnchainTest {
     }
 
     function test_AcceptsZylemHistoryProof() public {
+        // Copied to memory first, so the measured call does not include reading storage.
+        (bytes memory v, bytes memory g) = (pv, proof);
         uint256 before = gasleft();
-        verifier.verifyProof(PROGRAM, pv, proof);
+        verifier.verifyProof(PROGRAM, v, g);
         emit log_named_uint("verifyProof gas", before - gasleft());
         emit log_named_uint("proof bytes", proof.length);
         emit log_named_uint("public value bytes", pv.length);
@@ -79,10 +81,38 @@ contract ZylemOnchainTest {
         emit log_named_bytes32("last hash (internal order)", c.lastHash);
     }
 
+    /// The two whole-Ring proofs the demo's light Rings are checked against, each 8 leaves
+    /// of 512 headers: verified, read and recorded by the example oracle.
+    function test_AcceptsWholeRingProofs() public {
+        string[2] memory names = ["fixtures/history-4518274-4522369", "fixtures/history-4526466-4530561"];
+        uint64[2] memory firsts = [uint64(4_518_274), 4_526_466];
+        bytes32[2] memory tops = [
+            bytes32(0x5339bbe62b48a5142ccdf223011b114edf332d0f715da49d9f709ea5b8040000),
+            bytes32(0x7e6beb25ea7ad1b195c8a14a0ae734da49e140a98c84657725563a6b96250000)
+        ];
+        ZcashHeaderOracle oracle = new ZcashHeaderOracle(verifier, PROGRAM);
+        for (uint256 i = 0; i < 2; i++) {
+            bytes memory g = vm.readFileBinary(string.concat(names[i], ".groth16"));
+            bytes memory v = vm.readFileBinary(string.concat(names[i], ".pv"));
+            uint256 before = gasleft();
+            verifier.verifyProof(PROGRAM, v, g);
+            emit log_named_uint("verifyProof gas", before - gasleft());
+            ZylemClaim.Claim memory c = new ClaimReader().parse(v);
+            require(c.firstHeight == firsts[i] && c.lastHeight == firsts[i] + 4_095, "a whole Ring");
+            require(c.leaves == 8 && c.equihashChecked, "8 leaves with Equihash");
+            require(c.lastHash == tops[i], "top block hash");
+            before = gasleft();
+            oracle.submit(v, g);
+            emit log_named_uint("submit gas (verify + parse + store)", before - gasleft());
+            require(oracle.blockHash(c.lastHeight) == tops[i], "stored hash");
+        }
+    }
+
     function test_OracleRecordsTheProvenBlockHash() public {
         ZcashHeaderOracle oracle = new ZcashHeaderOracle(verifier, PROGRAM);
+        (bytes memory v, bytes memory g) = (pv, proof);
         uint256 before = gasleft();
-        oracle.submit(pv, proof);
+        oracle.submit(v, g);
         emit log_named_uint("submit gas (verify + parse + store)", before - gasleft());
         require(oracle.blockHash(4_529_025) == TOP_HASH, "stored hash");
     }

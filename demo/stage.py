@@ -1,5 +1,5 @@
-"""Stages the "Zcash without a node" demo page: two Rings, the published history proofs,
-the light Ring made from the second Ring and the smoke proof, and the WebAssembly client, for a host that serves only text types (binary files become
+"""Stages the "Zcash without a node" demo page: two Rings, the history proof of each and
+of the first NU7 blocks, both Rings as light Rings, and the WebAssembly client, for a host that serves only text types (binary files become
 base64 `.b64.txt`).
 
 Usage: python3 demo/stage.py OUT_DIR [--standalone] [--raw] [--home URL]
@@ -25,16 +25,12 @@ PKG = os.path.join(ROOT, "spikes/header-proof/wasm-verify/pkg-web")
 RINGS = {
     # The Ring with the demo payment: a real Ironwood payment, transaction 4 of 4,521,980.
     "payment": "ring-4518274-4522369-9bd762020e0052b1.zst",
-    # The Ring that contains the smoke proof's 1,536 blocks.
+    # A second recent Ring.
     "proven": "ring-4526466-4530561-4a8acfca511db7cc.zst",
 }
-# A light Ring carries each proven block's 104-byte record in place of its 1,487-byte
-# header. These are the sizes with every block proven, measured 2026-10-26 by rewriting
-# these Rings that way at the same zstd level (9). No proof covers a whole Ring yet.
-LIGHT_BYTES = {"payment": 2034975, "proven": 1632286}
-PROOFS = {"smoke": "publish/smoke", "shard0": "publish/nu7-shard0"}
-# `zylem-build light` output for the smoke proof: the second Ring with its proven blocks light.
-LIGHT = "publish/smoke"
+# Each Ring's own history proof (zylem-build publish, then light: the Ring with every
+# block's record in place of its header), and the proof of the first blocks after NU7.
+PROOFS = {"payment": "publish/ring-4518274", "proven": "publish/ring-4526466", "shard0": "publish/nu7-shard0"}
 
 shutil.rmtree(out, ignore_errors=True)
 os.makedirs(os.path.join(out, "data"))
@@ -58,13 +54,15 @@ files = {"rings": {}, "proofs": {}, "wasm_bytes": os.path.getsize(os.path.join(P
 for key, name in RINGS.items():
     e = next(r for r in manifest["rings"] if r["file"].endswith(name))
     files["rings"][key] = {"file": text(os.path.join(DATA, "testnet", e["file"]), name), "from": e["start_height"],
-                           "to": e["end_height"], "bytes": e["size"], "light_bytes": LIGHT_BYTES[key]}
+                           "to": e["end_height"], "bytes": e["size"]}
 
-light = json.load(open(os.path.join(DATA, LIGHT, "light.json")))["rings"][0]
-binding = json.load(open(os.path.join(DATA, LIGHT, light["binding"])))
-files["light"] = {"file": text(os.path.join(DATA, LIGHT, light["file"]), "light-ring"), "bytes": light["size"],
-                  "full_bytes": light["full_size"], "from": light["start_height"], "to": light["end_height"],
-                  "light": light["light"], "binding": binding, "proof": "smoke"}
+files["light"] = {}
+for key in RINGS:
+    d = os.path.join(DATA, PROOFS[key])
+    light = json.load(open(os.path.join(d, "light.json")))["rings"][0]
+    files["light"][key] = {"file": text(os.path.join(d, light["file"]), f"light-{key}"), "bytes": light["size"],
+                           "full_bytes": light["full_size"], "from": light["start_height"], "to": light["end_height"],
+                           "light": light["light"], "binding": json.load(open(os.path.join(d, light["binding"]))), "proof": key}
 
 trust = {}
 for key, rel in PROOFS.items():

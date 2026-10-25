@@ -3,9 +3,11 @@
 Checks Zylem's real history proof with SP1's own Groth16 verifier contract in a local EVM
 (Foundry), and shows what a contract learns from it.
 
-- `fixtures/`: the history proof for testnet blocks 4,527,490 to 4,529,025, proved on an
-  RTX 5090 with Equihash and wrapped in Groth16 (356 bytes), and its public values (the
-  697-byte claim). Copied from `data/publish/smoke`.
+- `fixtures/`: three history proofs, each proved on an RTX 5090 with Equihash and wrapped
+  in Groth16 (356 bytes), with their public values (the claim): testnet blocks 4,527,490
+  to 4,529,025 (3 leaves, the first run), and the two whole Rings 4,518,274 to 4,522,369
+  and 4,526,466 to 4,530,561 (8 leaves each) that the demo's light Rings are checked
+  against. Copied from `data/publish/`.
 - `src/sp1/`: `ISP1Verifier.sol` and the v6.1.0 `SP1VerifierGroth16.sol` and
   `Groth16Verifier.sol`, copied unchanged (MIT) from
   [succinctlabs/sp1-contracts](https://github.com/succinctlabs/sp1-contracts) at commit
@@ -18,16 +20,22 @@ Checks Zylem's real history proof with SP1's own Groth16 verifier contract in a 
 forge test -vv
 ```
 
-Results, 2026-10-27, Foundry 1.1.0, solc 0.8.28 with the optimizer:
+Results, 2026-10-28, Foundry 1.1.0, solc 0.8.28 with the optimizer. Gas is measured
+around the call with the proof and claim already in memory:
 
 | Test | Result |
 |---|---|
-| The proof verifies under Zylem's aggregation program key | passes, 303,762 gas for `verifyProof` |
+| The proof verifies under Zylem's aggregation program key | passes, 224,993 gas for `verifyProof` |
 | The claim reads blocks 4,527,490 to 4,529,025, top hash `000023ec…2f7a06`, 3 leaves, Equihash checked | passes |
-| The example oracle verifies, parses and stores the top block hash | passes, 334,361 gas for `submit` |
+| The example oracle verifies, parses and stores the top block hash | passes, 255,645 gas for `submit` |
+| Both whole-Ring proofs verify, read as 8 leaves with Equihash and the right top hash, and are recorded by the oracle | passes, 223,042 and 220,557 gas for `verifyProof`, about 253,190 for `submit` |
 | A claim with one byte changed (the last height) | refused |
 | Another program's key | refused |
 | A proof with one byte changed | refused, after consuming the call's gas |
+
+An earlier version of these tests measured the call with the proof read from contract
+storage, which added about 79,000 gas of the test's own storage reads (303,762 and
+334,361).
 
 The gas figures are for the calls inside the EVM; a transaction also pays its base cost
 and about 17,000 gas for the 1 KB of calldata. A bad proof fails in the pairing check by

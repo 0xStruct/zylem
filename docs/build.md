@@ -114,9 +114,9 @@ For every sealed Ring the proof covers, this writes a light copy into the publis
 directory: proven blocks carry their 104-byte records instead of their 1,487-byte headers,
 and the Ring's other blocks keep their headers. A binding file holds the sibling hashes
 that tie those records to the proof, and `light.json` lists them. Each light Ring is
-checked against the proof before it is written. On testnet, the Ring 4,526,466–4,530,561,
-with the smoke proof's 1,536 blocks light, drops from 7.19 MB to 5.10 MB. With every
-block proven, a Ring is about 2 MB.
+checked against the proof before it is written. On testnet, the Rings 4,518,274–4,522,369
+and 4,526,466–4,530,561, each proved whole (8 leaves), drop from 7.59 and 7.19 MB to 2.03
+and 1.63 MB. A Ring the proof covers only in part keeps headers for its other blocks.
 
 ## 3. Verify
 
@@ -172,7 +172,7 @@ Zylem's aggregation program key; the public values are the claim, which
 cd spikes/header-proof/onchain && forge test -vv
 ```
 
-Locally with Foundry: 303,762 gas to verify, 334,361 for an example contract that verifies,
+Locally with Foundry: 224,993 gas to verify, 255,645 for an example contract that verifies,
 reads the claim and stores the proven block hash. Not deployed on any chain yet; a
 production contract also needs a freshness rule and links between submitted ranges
 (`spikes/header-proof/onchain/README.md`).

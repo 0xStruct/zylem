@@ -700,7 +700,7 @@ zylem/spikes/header-proof/pipeline/run-shard.sh 0</pre>
             <tbody>
               <tr><td>An existing wallet</td><td><span class="mono">zylem-proxy</span>, a drop-in light-wallet server</td><td>Every Ring from the checkpoint; the wallet only changes its server address</td></tr>
               <tr><td>Browsers and phones</td><td>The WebAssembly client in <span class="mono">spikes/header-proof/wasm-verify</span> (1.8 MB)</td><td><span class="mono">RingFile.verify()</span> for a whole Ring; <span class="mono">verify_history</span> or <span class="mono">verify_history_v2</span> for the 1.27 MB proof; <span class="mono">verify_groth16</span> for the 356-byte proof; <span class="mono">check_all_records</span> and <span class="mono">verify_binding</span> to match a Ring to a proof; <span class="mono">RingFile.verify_light(publicValues, binding)</span> for a light Ring</td></tr>
-              <tr><td>Contracts on EVM chains</td><td>SP1's Groth16 verifier for circuit v6.1.0: <span class="mono">SP1VerifierGroth16.sol</span> from <span class="mono">succinctlabs/sp1-contracts</span></td><td><span class="mono">verifyProof(programKey, publicValues, proof)</span> with Zylem's aggregation key: 303,762 gas in a local EVM. Not deployed on a chain yet</td></tr>
+              <tr><td>Contracts on EVM chains</td><td>SP1's Groth16 verifier for circuit v6.1.0: <span class="mono">SP1VerifierGroth16.sol</span> from <span class="mono">succinctlabs/sp1-contracts</span></td><td><span class="mono">verifyProof(programKey, publicValues, proof)</span> with Zylem's aggregation key: 224,993 gas in a local EVM. Not deployed on a chain yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -744,7 +744,7 @@ wasm-pack build --release --target web --out-dir pkg-web</pre>
       </details>
       <details>
         <summary>What cross-chain use still needs</summary>
-        <p class="detail-p">The first piece works: SP1's v6.1.0 verifier contract accepts Zylem's 356-byte Groth16 history proof in a local EVM for 303,762 gas, and an example contract reads the claim and stores the proven block hash for 334,361 gas (<span class="mono">spikes/header-proof/onchain</span>). Nothing is deployed on a chain yet. The rest is still to build. A contract cannot ask independent sources for the tip, so it needs a freshness rule, such as accepting only facts a set depth below a proven tip that meets a minimum work, and someone who keeps the on-chain client updated. Wrapping runs on the GPU prover, once per history proof. Checking v5 and v6 transaction IDs on-chain means ZIP 244's BLAKE2b hashing. Facts about a shielded payment's amount or recipient need selective disclosure.</p>
+        <p class="detail-p">The first piece works: SP1's v6.1.0 verifier contract accepts Zylem's 356-byte Groth16 history proof in a local EVM for 224,993 gas, and an example contract reads the claim and stores the proven block hash for 255,645 gas (<span class="mono">spikes/header-proof/onchain</span>). Nothing is deployed on a chain yet. The rest is still to build. A contract cannot ask independent sources for the tip, so it needs a freshness rule, such as accepting only facts a set depth below a proven tip that meets a minimum work, and someone who keeps the on-chain client updated. Wrapping runs on the GPU prover, once per history proof. Checking v5 and v6 transaction IDs on-chain means ZIP 244's BLAKE2b hashing. Facts about a shielded payment's amount or recipient need selective disclosure.</p>
       </details>
       </div>
   </section>
