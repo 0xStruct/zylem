@@ -1,0 +1,11 @@
+// Cloudflare static hosting for the site built by web/build.py (Pages, now served by
+// Workers with static assets; no Worker script runs). Deploy: npx wrangler deploy -c web/wrangler.jsonc
+{
+  "name": "zylem",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "../data/site",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+}

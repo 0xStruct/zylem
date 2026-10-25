@@ -14,6 +14,9 @@ History travels as **Rings**: one file per 4,096-block epoch that anyone can hos
 because every block inside is re-verified. `zylem-proxy` speaks the standard
 light-wallet protocol, so an unmodified wallet switches by changing one server URL.
 
+**Live demo:** [zylem.cash/demo](https://zylem.cash/demo/)
+opens real testnet Rings and SP1 proofs and verifies them in the browser, with no node.
+
 ## Status
 
 Phases 0 to 2 of the [phase plan](https://claude.ai/code/artifact/69b2d462-7d97-4b9a-8861-7403b1b3468f)
@@ -31,6 +34,8 @@ headers from NU6 across NU7 pass them, and Zylem agrees with Zakura on 400,000 r
 contexts, Equihash, and 46,542 rebuilt transaction IDs ([docs/phase3.md](docs/phase3.md)).
 
 Numbers: [docs/phase0.md](docs/phase0.md). Demo: [docs/demo.md](docs/demo.md).
+Build Rings, prove them in SP1 and verify them (proxy, WebAssembly, Groth16 contract):
+[docs/build.md](docs/build.md).
 
 ## Crates
 

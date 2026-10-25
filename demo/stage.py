@@ -2,10 +2,12 @@
 and the WebAssembly client, for a host that serves only text types (binary files become
 base64 `.b64.txt`).
 
-Usage: python3 demo/stage.py OUT_DIR [--standalone]
+Usage: python3 demo/stage.py OUT_DIR [--standalone] [--raw] [--home URL]
 
 `--standalone` wraps the page in its own HTML document (charset, viewport) for a plain
-static host; without it the page is the fragment an Artifact publish wraps.
+static host; without it the page is the fragment an Artifact publish wraps. `--raw` keeps
+Rings and proofs as binary files under their hash-named source names, for hosts that serve
+any type (and cache them for good). `--home` links the page's "Zylem" label to a home page.
 
 The page pins the program keys and starting blocks it trusts. They are taken here from
 the operator's own publish directories (zylem-build publish output), not from anything
@@ -16,6 +18,8 @@ import base64, json, os, shutil, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out = sys.argv[1]
 standalone = "--standalone" in sys.argv[2:]
+raw = "--raw" in sys.argv[2:]
+home = sys.argv[sys.argv.index("--home") + 1] if "--home" in sys.argv else None
 DATA = os.path.join(ROOT, "data")
 PKG = os.path.join(ROOT, "spikes/header-proof/wasm-verify/pkg-web")
 RINGS = {
@@ -38,6 +42,10 @@ for f in ("zylem_wasm_verify.js", "zylem_wasm_verify_bg.wasm"):
 
 
 def text(src, name):
+    if raw:
+        # Source names carry the file's hash, so a host can cache them forever.
+        shutil.copy(src, os.path.join(out, "data", os.path.basename(src)))
+        return "data/" + os.path.basename(src)
     with open(src, "rb") as f, open(os.path.join(out, "data", name + ".b64.txt"), "w") as g:
         g.write(base64.b64encode(f.read()).decode())
     return "data/" + name + ".b64.txt"
@@ -71,9 +79,39 @@ for key, rel in PROOFS.items():
 
 page = open(os.path.join(ROOT, "demo/index.html")).read()
 page = page.replace("/*FILES*/null", json.dumps(files)).replace("/*TRUST*/null", json.dumps(trust))
+SITEBAR = '''<header class="sitebar">
+    <a class="mark" href="{h}" aria-label="Zylem home">
+      <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="13" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="13" r="3.5" fill="currentColor"/></svg>
+      Zylem
+    </a>
+    <nav aria-label="Site">
+      <a href="{h}#attacks">Why Zylem</a>
+      <a href="{h}how/">How it works</a>
+      <a href="{h}#numbers">Performance</a>
+      <a href="{h}#try">Developers</a>
+      <a class="nav-cta" href="#s1" aria-current="page">Live demo</a>
+    </nav>
+    <details class="menu">
+      <summary aria-label="All pages">Menu</summary>
+      <div>
+        <a href="{h}">Home</a>
+        <a href="{h}#attacks">Why Zylem</a>
+        <a href="{h}how/">How it works</a>
+        <a href="{h}#numbers">Performance</a>
+        <a href="{h}#try">Developers</a>
+        <a href="{h}how/#details">Technical details</a>
+      </div>
+    </details>
+  </header>'''
+if home:
+    # Part of the site: the same top bar as the other pages, with the demo as the current page.
+    page = page.replace("<!--SITEBAR-->", SITEBAR.replace("{h}", home))
+else:
+    page = page.replace("  <!--SITEBAR-->\n", "")
 if standalone:
     page = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+            + (f'<link rel="icon" href="{home}favicon.svg" type="image/svg+xml">\n' if home else '') +
             '<style>body{margin:0}[hidden]{display:none!important}</style>\n</head>\n<body>\n' + page + '\n</body>\n</html>\n')
 open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(page)
 for root, _, fs in os.walk(out):

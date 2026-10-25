@@ -9,15 +9,18 @@
 :root {
   --paper: #f1f4ef; --paper-2: #e7ece5; --ink: #142019; --muted: #56645b; --rule: #d3dbd2;
   --accent: #1d6b47; --accent-tint: #d4ebdc; --bad: #a3392b; --bad-tint: #f6e1dd;
+  --text-3: #66746b; --accent-muted: #3d7a5c; --rule-soft: #e0e6df;
+  --r-control: 8px; --r-card: 12px; --r-pill: 999px;
+  --s1: 8px; --s2: 12px; --s3: 16px; --s4: 24px; --s5: 40px; --s6: 64px;
   --seg-1: #1d6b47; --seg-2: #5f9a7a; --seg-3: #a9c9b5; --seg-4: #cfdcd2;
   --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #f08a7a; --bad-tint: #3a1d18; --seg-1: #6fd2a0; --seg-2: #3f8f68; --seg-3: #2a5c45; --seg-4: #1f3a2e; color-scheme: dark; }
+  :root:not([data-theme="light"]) { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #ed8b7d; --bad-tint: #3a1d18; --text-3: #728078; --accent-muted: #4f9673; --rule-soft: #1c2a23; --rule: #26372e; --paper-2: #121c17; --seg-1: #6fd2a0; --seg-2: #3f8f68; --seg-3: #2a5c45; --seg-4: #1f3a2e; color-scheme: dark; }
 }
-:root[data-theme="dark"] { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #f08a7a; --bad-tint: #3a1d18; --seg-1: #6fd2a0; --seg-2: #3f8f68; --seg-3: #2a5c45; --seg-4: #1f3a2e; color-scheme: dark; }
+:root[data-theme="dark"] { --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b; --accent: #6fd2a0; --accent-tint: #173627; --bad: #ed8b7d; --bad-tint: #3a1d18; --text-3: #728078; --accent-muted: #4f9673; --rule-soft: #1c2a23; --rule: #26372e; --paper-2: #121c17; --seg-1: #6fd2a0; --seg-2: #3f8f68; --seg-3: #2a5c45; --seg-4: #1f3a2e; color-scheme: dark; }
 body { background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--body); }
 .wrap { max-width: 1000px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
@@ -25,31 +28,43 @@ h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; line-height: 1.02; let
 h2 { font-size: 1.35rem; font-weight: 600; }
 h3 { font-size: 1.02rem; font-weight: 600; }
 p { margin: 0; }
-a { color: var(--accent); }
-.eyebrow { font: 500 0.75rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+a { color: var(--accent-muted); text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
+.eyebrow { font: 500 0.8rem/1.4 var(--mono); letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
 .lede { color: var(--muted); max-width: 66ch; font-size: 1.05rem; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
+.cap { color: var(--text-3); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
 header.top { display: grid; gap: 12px; margin-bottom: 30px; }
 .status { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.9rem; color: var(--muted); }
 .status b { color: var(--ink); font-weight: 600; }
-.steps { display: grid; gap: 18px; }
-.step { border: 1px solid var(--rule); border-radius: 14px; padding: 20px 22px; display: grid; gap: 14px; min-width: 0; }
+.steps { display: grid; gap: var(--s4); }
+.step { border: 1px solid var(--rule); border-radius: var(--r-card); padding: var(--s4); display: grid; gap: var(--s3); min-width: 0; }
 .step-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-items: baseline; }
 .step-n { font: 800 1.35rem/1 var(--display); color: var(--accent); grid-row: span 2; font-variant-numeric: tabular-nums; }
 .step-head p { color: var(--muted); font-size: 0.95rem; max-width: 70ch; }
-.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-button { font: 600 0.9rem/1 var(--body); padding: 10px 15px; border-radius: 999px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--paper); cursor: pointer; }
+.controls { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+button { font: 600 0.9rem/1 var(--body); padding: 10px 15px; border-radius: var(--r-pill); border: 1.5px solid var(--accent); background: var(--accent); color: var(--paper); cursor: pointer; }
 button.ghost { background: none; color: var(--accent); }
+button.quiet { background: none; color: var(--muted); border-color: var(--rule); }
+button.quiet:hover { color: var(--ink); border-color: var(--muted); }
 button.danger { border-color: var(--bad); background: none; color: var(--bad); }
-button[aria-pressed="true"] { background: var(--accent); color: var(--paper); }
+button.danger:hover { background: var(--bad-tint); }
+/* A check that passed keeps a settled state on its own button. */
+button.is-verified { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
+button.is-verified::before { content: "✓ "; }
+/* Ring selectors: segmented choices, not actions. */
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: var(--r-pill); background: var(--paper-2); border: 1px solid var(--rule-soft); }
+.seg button { background: none; border-color: transparent; color: var(--muted); font-variant-numeric: tabular-nums; }
+.seg button:hover { color: var(--ink); background: var(--paper); }
+.seg button[aria-checked="true"] { background: var(--paper); border-color: var(--accent); color: var(--ink); }
 button:disabled { opacity: 0.5; cursor: default; }
 button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-input { font: 400 0.92rem/1.2 var(--mono); padding: 9px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); max-width: 100%; min-width: 0; }
+input { font: 400 0.92rem/1.2 var(--mono); padding: 9px 10px; border-radius: var(--r-control); border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); max-width: 100%; min-width: 0; }
 input.wide { width: min(100%, 44rem); }
 input.short { width: 8.5rem; }
 label { font-size: 0.88rem; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.result { border-radius: 9px; padding: 12px 14px; font-size: 0.92rem; background: var(--paper-2); min-width: 0; overflow-wrap: anywhere; }
+.result { border-radius: var(--r-control); padding: var(--s2) 14px; font-size: 0.92rem; background: var(--paper-2); min-width: 0; overflow-wrap: anywhere; }
 .result.ok { background: var(--accent-tint); }
 .result.bad { background: var(--bad-tint); }
 .result:empty { display: none; }
@@ -57,23 +72,24 @@ label { font-size: 0.88rem; color: var(--muted); display: inline-flex; gap: 8px;
 .ok .verdict { color: var(--accent); }
 .bad .verdict { color: var(--bad); }
 .kv { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); gap: 4px 14px; font-size: 0.88rem; margin: 0; }
-.kv dt { color: var(--muted); }
-.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kv dt { color: var(--text-3); }
+.kv dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kv dd .h { font: 400 0.84rem/1.45 var(--mono); }
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.fact { background: var(--paper-2); border-radius: 9px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.fact { background: var(--paper-2); border-radius: var(--r-control); padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
 .fact b { font: 600 1.2rem/1.2 var(--display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.fact span { font-size: 0.8rem; color: var(--muted); }
-.bar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; border: 1px solid var(--rule); }
+.fact span { font-size: 0.82rem; color: var(--text-3); }
+.bar { display: flex; height: 26px; border-radius: var(--r-control); overflow: hidden; border: 1px solid var(--rule-soft); }
 .bar div { min-width: 2px; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.84rem; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.84rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 .strip { display: grid; gap: 6px; }
-canvas.blocks { width: 100%; height: 72px; display: block; cursor: crosshair; border-radius: 7px; background: var(--paper-2); }
-.axis { display: flex; justify-content: space-between; font: 400 0.76rem/1 var(--mono); color: var(--muted); }
-.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 9px; }
+canvas.blocks { width: 100%; height: 72px; display: block; cursor: crosshair; border-radius: var(--r-control); background: var(--paper-2); }
+.axis { display: flex; justify-content: space-between; gap: var(--s2); font-size: 0.8rem; line-height: 1.3; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule-soft); border-radius: var(--r-control); }
 table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
-th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
-th { font: 500 0.72rem/1.2 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--paper-2); }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { font: 500 0.78rem/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); background: var(--paper-2); }
 tr:last-child td { border-bottom: 0; }
 tr.mark td { background: var(--accent-tint); }
 td.mono { font-size: 0.82rem; }
@@ -82,22 +98,91 @@ td.mono { font-size: 0.82rem; }
 .checks li::before { content: "·"; font: 700 1rem/1.5 var(--mono); color: var(--muted); text-align: center; }
 .checks.done li::before { content: "✓"; color: var(--accent); }
 .checks.failed li::before { content: "✗"; color: var(--bad); }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 14px; }
-.card { border: 1px solid var(--rule); border-radius: 11px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--s3); }
+.card { background: var(--paper-2); border-radius: var(--r-card); padding: var(--s3); display: grid; gap: 10px; align-content: start; min-width: 0; }
 .block-view { display: grid; gap: 14px; }
 .attacks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 12px; }
-.attack { border: 1px solid var(--rule); border-radius: 11px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.attack { background: var(--paper-2); border-radius: var(--r-card); padding: var(--s3); display: grid; gap: 8px; align-content: start; min-width: 0; }
 .attack p { font-size: 0.88rem; color: var(--muted); }
-.compare td:first-child { white-space: normal; }
+.card .result:not(.ok):not(.bad), .attack .result:not(.ok):not(.bad), .card .fact { background: var(--paper); }
+.kv.evm { padding-top: var(--s2); border-top: 1px solid var(--rule-soft); }
+.compare td { white-space: normal; }
 .venues { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 12px; }
-.venue { background: var(--accent-tint); border-radius: 11px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.venue { background: var(--paper-2); border-radius: var(--r-card); padding: var(--s3) 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
 .venue .big { font: 800 clamp(1.8rem, 4vw, 2.4rem)/1 var(--display); font-variant-numeric: tabular-nums; }
+.venue p:last-child { color: var(--muted); }
 .venue p:last-child { font-size: 0.92rem; }
-.trust { margin-top: 10px; padding-block: 26px 6px; border-top: 2px solid var(--ink); display: grid; gap: 16px; min-width: 0; }
+/* Site bar, present when the demo is part of the site: the same mark and links as the other pages. */
+.sitebar { position: relative; padding-block: 6px 22px; display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.sitebar .mark { display: flex; align-items: center; gap: 10px; font: 800 1.25rem/1 var(--display); color: var(--ink); text-decoration: none; }
+.sitebar .mark svg { width: 26px; height: 26px; }
+.sitebar nav { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; font-size: 0.95rem; }
+.sitebar nav a { color: var(--muted); text-decoration: none; }
+.sitebar nav a:hover { color: var(--ink); }
+.sitebar .nav-cta { color: var(--accent); font-weight: 600; border: 1.5px solid var(--accent); border-radius: var(--r-pill); padding: 5px 12px; background: var(--accent-tint); }
+.sitebar details.menu { display: none; }
+.sitebar details.menu > summary { list-style: none; cursor: pointer; color: var(--ink); font: 600 0.95rem/1 var(--body); padding: 9px 14px; border: 1.5px solid var(--rule); border-radius: var(--r-pill); }
+.sitebar details.menu > summary::-webkit-details-marker { display: none; }
+.sitebar details.menu[open] > div { position: absolute; right: 0; top: 56px; z-index: 20; display: grid; gap: 2px; min-width: 220px; padding: 8px; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--r-card); box-shadow: 0 12px 32px rgb(0 0 0 / 0.18); }
+.sitebar details.menu[open] > div a { padding: 10px 12px; border-radius: var(--r-control); color: var(--ink); text-decoration: none; }
+.sitebar details.menu[open] > div a:hover { background: var(--paper-2); }
+@media (max-width: 760px) {
+  .sitebar nav a:not(.nav-cta) { display: none; }
+  .sitebar nav { margin-left: auto; }
+  .sitebar details.menu { display: block; }
+}
+/* Guided flow: a sticky step bar, locked steps that open in order, and a done state. */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
+.stepbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); border-bottom: 1px solid var(--rule-soft); margin: 0 0 var(--s4); padding-block: var(--s2); display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); align-items: center; justify-content: space-between; }
+.stepbar ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.stepbar a { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px 6px 6px; border-radius: var(--r-pill); color: var(--text-3); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+.stepbar a:hover { color: var(--ink); background: var(--paper-2); }
+.stepbar .dot { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--rule); display: inline-grid; place-items: center; font: 600 0.75rem/1 var(--body); font-variant-numeric: tabular-nums; }
+.stepbar li.current a { color: var(--ink); background: var(--paper-2); }
+.stepbar li.current .dot { border-color: var(--accent); color: var(--accent); }
+.stepbar li.done a { color: var(--muted); }
+.stepbar li.done .dot { background: var(--accent); border-color: var(--accent); color: var(--paper); font-size: 0; }
+.stepbar li.done .dot::before { content: "✓"; font-size: 0.75rem; }
+button.small { padding: 7px 12px; font-size: 0.84rem; }
+@media (max-width: 560px) {
+  .stepbar { flex-wrap: nowrap; }
+  .stepbar a { font-size: 0; gap: 0; padding: 4px; }
+  .stepbar ol { gap: 2px; flex-wrap: nowrap; }
+}
+.step-n { width: 2rem; height: 2rem; border-radius: 50%; border: 1.5px solid var(--rule); display: inline-grid; place-items: center; font-size: 1rem !important; align-self: start; }
+.step.done { border-color: var(--accent-muted); }
+.step.done .step-n { background: var(--accent); border-color: var(--accent); color: var(--paper); font-size: 0 !important; }
+.step.done .step-n::before { content: "✓"; font-size: 1rem; }
+.step.locked { border-style: dashed; }
+.step.locked > :not(.step-head):not(.locked-note) { display: none !important; }
+.step.locked .step-head p { display: none; }
+.locked-note { display: none; color: var(--text-3); font-size: 0.9rem; }
+.step.locked .locked-note { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.start { display: grid; gap: var(--s2); padding: var(--s3); border-radius: var(--r-card); background: var(--paper-2); }
+.start-line { font-size: 1.05rem; max-width: 60ch; }
+.progress { display: grid; gap: 6px; }
+.pbar { height: 8px; border-radius: var(--r-pill); background: var(--paper); overflow: hidden; border: 1px solid var(--rule-soft); }
+.pbar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+.ring-body { display: grid; gap: var(--s3); }
+details.inspect { border-top: 1px solid var(--rule-soft); padding-top: var(--s2); }
+details.inspect > summary { cursor: pointer; color: var(--accent-muted); font-weight: 500; }
+details.inspect[open] { display: grid; gap: var(--s3); }
+.trustline { font-size: 0.88rem; color: var(--text-3); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* On phones, comparison tables become one card per row. */
+@media (max-width: 640px) {
+  table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: auto; }
+  table.stack thead { display: none; }
+  table.stack tr { padding: var(--s2) 14px; border-bottom: 1px solid var(--rule-soft); }
+  table.stack td { border: 0; padding: 3px 0; white-space: normal; min-width: 0 !important; }
+  table.stack td:first-child { font-weight: 600; color: var(--ink); padding-bottom: 6px; }
+  table.stack td:not(:first-child)::before { content: attr(data-label); display: block; font: 500 0.74rem/1.4 var(--mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); }
+}
+.trust { margin-top: var(--s2); padding-block: var(--s4) 6px; border-top: 2px solid var(--rule); display: grid; gap: 16px; min-width: 0; }
 .trust-head { display: grid; gap: 8px; max-width: 72ch; }
 .trust h2 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; }
 .versus td, .versus th { white-space: normal; vertical-align: top; min-width: 9rem; }
-.versus td:first-child { color: var(--muted); min-width: 10rem; }
+.versus td:first-child { color: var(--text-3); min-width: 10rem; }
 .versus th:not(:first-child) { color: var(--ink); }
 .versus .yes { color: var(--accent); font-weight: 600; }
 .versus .no { color: var(--bad); font-weight: 600; }
@@ -109,21 +194,41 @@ footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: gri
 </style>
 
 <div class="wrap">
+  <!--SITEBAR-->
   <header class="top">
     <p class="eyebrow">Zylem · Zcash testnet</p>
     <h1>Verifiable Zcash data, no node required</h1>
-    <p class="lede">Everything on this page is a plain file from this page's host: two Rings of 4,096 blocks and two history proofs made on a GPU. Your browser checks all of it with the same Rust code a Zylem client runs, compiled to WebAssembly. The host is not trusted for any of it.</p>
-    <div class="status" id="status"><span>Loading the verifier…</span></div>
+    <p class="lede">The data comes from this page's host as plain files: Rings of 4,096 real testnet blocks and history proofs made on a GPU. Your browser checks all of it with the same Rust code a Zylem client runs, so the host never has to be trusted.</p>
+    <div class="status" id="status"><span>Nothing downloaded yet.</span></div>
   </header>
 
+  <nav class="stepbar" aria-label="Demo steps">
+    <ol id="stepbar">
+      <li data-step="1"><a href="#s1"><span class="dot">1</span>Open</a></li>
+      <li data-step="2"><a href="#s2"><span class="dot">2</span>Verify</a></li>
+      <li data-step="3"><a href="#s3"><span class="dot">3</span>Find</a></li>
+      <li data-step="4"><a href="#s4"><span class="dot">4</span>Attack</a></li>
+      <li data-step="5"><a href="#s5"><span class="dot">5</span>Prove</a></li>
+    </ol>
+    <button class="quiet small" id="show-all">Show all steps</button>
+  </nav>
+
   <div class="steps">
-    <section class="step" aria-labelledby="s1">
+    <section class="step" data-step="1" aria-labelledby="s1">
       <div class="step-head"><span class="step-n">1</span><h2 id="s1">Open a Ring</h2>
-        <p>A Ring holds 4,096 consecutive blocks: every full header, every transaction in the compact form wallets already download, a few hundred bytes of digests per transaction so its ID can be rebuilt, and the tree state it starts from.</p></div>
-      <div class="controls" role="group" aria-label="Ring">
-        <button class="ghost" id="pick-payment" aria-pressed="true">Blocks 4,518,274–4,522,369</button>
-        <button class="ghost" id="pick-proven" aria-pressed="false">Blocks 4,526,466–4,530,561</button>
-        <span class="muted mono" id="ring-load"></span>
+        <p>A Ring is one file holding 4,096 consecutive Zcash blocks, about a day of the chain, packaged so any website can host it. Inside are the block headers, every transaction in the compact form wallets already download, short digests that let each transaction's ID be rebuilt, and the state the Ring starts from.</p></div>
+      <div class="start" id="start">
+        <p class="start-line">In about a minute you will check 4,096 real Zcash blocks in this browser and catch a server trying to fake a payment.</p>
+        <div class="controls"><button id="load">Load the sample Ring</button><span class="cap" id="load-note"></span></div>
+        <div class="progress" id="progress" hidden><div class="pbar"><i id="pfill"></i></div><span class="cap" id="ptext"></span></div>
+      </div>
+      <div class="ring-body" id="ring-body" hidden>
+      <div class="controls">
+        <div class="seg" role="radiogroup" aria-label="Ring">
+          <button role="radio" id="pick-payment" aria-checked="true">Blocks 4,518,274–4,522,369</button>
+          <button role="radio" id="pick-proven" aria-checked="false" tabindex="-1">Blocks 4,526,466–4,530,561</button>
+        </div>
+        <span class="cap" id="ring-load"></span>
       </div>
       <p class="muted" id="ring-why"></p>
       <div class="facts" id="facts"></div>
@@ -135,35 +240,42 @@ footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: gri
         <canvas class="blocks" id="blocks" tabindex="0" aria-label="Transactions per block across the Ring. Click a block to open it."></canvas>
         <div class="axis"><span id="axis-from"></span><span>transactions per block · click to open one</span><span id="axis-to"></span></div>
       </div>
+      <details class="inspect" id="inspect">
+        <summary>Inspect a block: its header fields and rebuilt transaction IDs</summary>
       <div class="controls">
         <label for="height">Block <input class="short" id="height" inputmode="numeric" autocomplete="off"></label>
-        <button class="ghost" id="show-block">Open block</button>
+        <button class="quiet" id="show-block">Open block</button>
       </div>
       <div id="block-view" class="block-view" hidden>
         <dl class="kv" id="block-kv"></dl>
         <div class="table-wrap"><table><thead><tr><th>#</th><th>Transaction ID (rebuilt)</th><th>v</th><th>Transparent</th><th>Sapling</th><th>Orchard</th><th>Ironwood</th></tr></thead><tbody id="tx-rows"></tbody></table></div>
       </div>
       <p class="muted" id="block-note" hidden>These IDs were rebuilt here from the compact data and digests in the Ring, and together they produce this header's Merkle root. A server that changed any transaction could not make them match.</p>
+      </details>
+      </div>
     </section>
 
-    <section class="step" aria-labelledby="s2">
+    <section class="step locked" data-step="2" aria-labelledby="s2">
       <div class="step-head"><span class="step-n">2</span><h2 id="s2">Check the whole Ring</h2>
         <p>The full client check, block by block. This is what lets any mirror, CDN or stranger host Rings: a client accepts nothing it cannot rebuild.</p></div>
+      <p class="locked-note">Opens after step 1. <button class="quiet small" data-open="2">Open it now</button></p>
       <ul class="checks" id="checks">
         <li>Every header has a valid Equihash solution, meets its own target and links to the one before; the difficulty and time rules apply once 113 earlier headers are known.</li>
         <li>Every transaction ID is rebuilt from the compact data and digests, and the IDs reproduce each header's Merkle root.</li>
         <li>The history tree, replayed block by block, matches what every following header commits to, which authenticates each block's tree roots.</li>
         <li>The Ring's note commitments, appended to its starting tree state, reproduce those authenticated roots, so every tree state inside is authenticated too.</li>
       </ul>
-      <div class="controls"><button id="verify">Check this Ring</button><span class="muted" id="verify-busy"></span></div>
+      <div class="controls"><button id="verify">Check this Ring</button><button class="quiet" id="verify-again" hidden>Run again</button><span class="cap" id="verify-busy"></span></div>
+      <p class="trustline">You rely on the cryptography and the code running in this tab, not on the host that served the file.</p>
       <div class="result" id="verify-result"></div>
     </section>
 
-    <section class="step" aria-labelledby="s3">
+    <section class="step locked" data-step="3" aria-labelledby="s3">
       <div class="step-head"><span class="step-n">3</span><h2 id="s3">Find a payment</h2>
         <p>Look up a transaction by its ID among the IDs rebuilt in step 2. A server can only make a payment appear if the Ring's own data rebuilds that exact ID inside an authenticated block.</p></div>
+      <p class="locked-note">Opens after step 2. <button class="quiet small" data-open="3">Open it now</button></p>
       <div class="controls">
-        <button class="ghost" id="try-real">Try a real payment's ID</button>
+        <button id="try-real">Try a real payment's ID</button>
         <button class="ghost" id="try-fake">Try an ID that is not on chain</button>
       </div>
       <div class="controls">
@@ -173,38 +285,41 @@ footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: gri
       <div class="result" id="find-result"></div>
     </section>
 
-    <section class="step" aria-labelledby="s4">
+    <section class="step locked" data-step="4" aria-labelledby="s4">
       <div class="step-head"><span class="step-n">4</span><h2 id="s4">Try to lie</h2>
         <p>Each button makes a copy of the open Ring altered the way a dishonest server would, then runs the step 2 check on it. The server would also publish a matching file hash, so only verification can catch it. The target follows the block opened in step 1; any transaction works.</p></div>
+      <p class="locked-note">Opens after step 3. <button class="quiet small" data-open="4">Open it now</button></p>
       <div class="controls">
         <label for="atk-height">At block <input class="short" id="atk-height" inputmode="numeric" autocomplete="off"></label>
         <label for="atk-tx">transaction <input class="short" id="atk-tx" inputmode="numeric" autocomplete="off" placeholder="first Ironwood"></label>
       </div>
       <div class="attacks">
-        <div class="attack"><h3>Invent an incoming note</h3><p>Adds a fake Ironwood action, as if someone had paid the wallet.</p><button class="danger" data-attack="inject">Add a fake note</button><div class="result" id="atk-inject"></div></div>
-        <div class="attack"><h3>Hide a payment</h3><p>Leaves one transaction out of its block, so the wallet never sees it.</p><button class="danger" data-attack="hide">Hide the transaction</button><div class="result" id="atk-hide"></div></div>
-        <div class="attack"><h3>Serve a wrong tree state</h3><p>Swaps the starting Ironwood tree for another of the same size, so a wallet would build unspendable anchors.</p><button class="danger" data-attack="tree">Swap the tree state</button><div class="result" id="atk-tree"></div></div>
+        <div class="attack"><h3>Invent an incoming note</h3><p>Adds a fake Ironwood action, as if someone had paid the wallet.</p><button class="danger" data-attack="inject">Simulate a fake note</button><div class="result" id="atk-inject"></div></div>
+        <div class="attack"><h3>Hide a payment</h3><p>Leaves one transaction out of its block, so the wallet never sees it.</p><button class="danger" data-attack="hide">Simulate a hidden payment</button><div class="result" id="atk-hide"></div></div>
+        <div class="attack"><h3>Serve a wrong tree state</h3><p>Swaps the starting Ironwood tree for another of the same size, so a wallet would build unspendable anchors.</p><button class="danger" data-attack="tree">Simulate a wrong tree state</button><div class="result" id="atk-tree"></div></div>
       </div>
+      <div class="controls"><button class="quiet" id="atk-reset" hidden>Reset simulations</button><span class="cap">Simulations change a copy held in this tab. Nothing is sent anywhere, and the chain is untouched.</span></div>
     </section>
 
-    <section class="step" aria-labelledby="s5">
+    <section class="step locked" data-step="5" aria-labelledby="s5">
       <div class="step-head"><span class="step-n">5</span><h2 id="s5">Verify succinct proof on mobile and on-chain</h2>
-        <p>A succinct proof of Zcash data stays small and quick to check however many blocks it covers. One SP1 proof states that every header in a range passed Equihash, its target and the difficulty rules, and commits to a 104-byte record of each block. The same claim comes in two forms: one a phone checks, and one a smart contract checks.</p></div>
+        <p>A succinct proof of Zcash data stays small and quick to check however many blocks it covers. One SP1 proof states that every header in a range passed Equihash, its target and the difficulty rules, and commits to a 104-byte record of each block. Wrapped in Groth16, the whole claim fits in 356 bytes that a phone and a smart contract both verify.</p></div>
+      <p class="locked-note">Opens after step 4. <button class="quiet small" data-open="5">Open it now</button></p>
       <div class="venues">
         <div class="venue">
-          <p class="eyebrow">On mobile</p>
-          <b class="big">1.27 MB</b>
-          <p>A compressed STARK, with no trusted setup. It verifies in this browser in <b class="mono" id="v-mobile">a few dozen ms</b> on whatever device opened this page, then stands in for every header it covers.</p>
+          <p class="eyebrow">On mobile and on-chain</p>
+          <b class="big">356 bytes</b>
+          <p>The proof wrapped in Groth16 over BN254. This browser verifies it in <b class="mono" id="v-chain">a few hundred ms</b>, and SP1's own verifier contract accepted these exact bytes in a local EVM for about 304,000 gas. No contract is deployed on a chain yet. Its one extra assumption is SP1's Groth16 trusted setup.</p>
         </div>
         <div class="venue">
-          <p class="eyebrow">On-chain</p>
-          <b class="big">356 bytes</b>
-          <p>The same claim wrapped in Groth16 over BN254, the form SP1's verifier contracts check on EVM chains. It verifies here in <b class="mono" id="v-chain">a few hundred ms</b>. No contract is deployed yet.</p>
+          <p class="eyebrow">Without a trusted setup</p>
+          <b class="big">1.27 MB</b>
+          <p>The compressed STARK the wrap is made from. It needs no trusted setup and verifies here in <b class="mono" id="v-mobile">a few dozen ms</b>, for clients that want the fewest assumptions.</p>
         </div>
       </div>
       <div class="grid2">
         <div class="card">
-          <h3>On mobile: check the STARK proofs</h3>
+          <h3>Check the STARK proofs</h3>
           <p class="muted" id="smoke-desc"></p>
           <div class="controls"><button id="smoke-verify">Verify the proof</button><button class="ghost" id="smoke-bind">Match the Ring to it</button></div>
           <div class="result" id="smoke-result"></div>
@@ -212,17 +327,24 @@ footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: gri
           <p class="muted" id="shard-desc"></p>
           <div class="controls"><button class="ghost" id="shard-verify">Verify the NU7 proof</button></div>
           <div class="result" id="shard-result"></div>
-          <div class="controls"><label for="rec-height">Block <input class="short" id="rec-height" inputmode="numeric" autocomplete="off"></label><button class="ghost" id="rec-show">Show its proven record</button></div>
+          <div class="controls"><label for="rec-height">Block <input class="short" id="rec-height" inputmode="numeric" autocomplete="off"></label><button class="quiet" id="rec-show">Show its proven record</button></div>
           <div class="result" id="rec-result"></div>
         </div>
         <div class="card">
-          <h3>On-chain: check the 356-byte proof</h3>
-          <p class="muted">A contract that accepts this proof learns, from the proof alone, the Zcash block hash at the top of the range, the total work behind it and a commitment to every block's record. Bridges and other chains can build on that without running a Zcash node.</p>
-          <div class="controls"><button id="smoke-groth">Verify the 356-byte proof</button></div>
+          <h3>Check the 356-byte proof</h3>
+          <p class="muted">Your phone verifies it the way this page does. A contract that accepts it learns, from the proof alone, the Zcash block hash at the top of the range, the total work behind it and a commitment to every block's record, so bridges and other chains can build on Zcash without running a node.</p>
+          <div class="controls"><button class="ghost" id="smoke-groth">Verify the 356-byte proof</button></div>
           <div class="result" id="groth-result"></div>
+          <dl class="kv evm">
+            <dt>Tested on an EVM</dt><dd>SP1's v6.1.0 verifier contract, run locally with Foundry</dd>
+            <dt>Verify this proof</dt><dd>303,762 gas, accepted</dd>
+            <dt>Example oracle</dt><dd>334,361 gas to verify, read the claim and store block 4,529,025's hash</dd>
+            <dt>Refused</dt><dd>a changed claim, a changed proof, another program's key</dd>
+            <dt>On a real chain</dt><dd>Not deployed yet</dd>
+          </dl>
         </div>
       </div>
-      <div class="table-wrap"><table class="compare"><thead><tr><th>Same blocks, two ways</th><th>Check every header</th><th>Check the proof</th></tr></thead><tbody id="compare"></tbody></table></div>
+      <div class="table-wrap"><table class="compare stack"><thead><tr><th>Same blocks, two ways</th><th>Check every header</th><th>Check the proof</th></tr></thead><tbody id="compare"></tbody></table></div>
     </section>
 
     <section class="trust" aria-labelledby="s6">
@@ -231,10 +353,10 @@ footer { margin-top: 30px; color: var(--muted); font-size: 0.88rem; display: gri
         <h2 id="s6">Don't trust, verify</h2>
         <p class="muted">Today's Zcash light wallets download compact blocks from a light-wallet server and take them as given. Zylem gives the same wallets data they can check. Steps 2 to 5 above are the checks in the Zylem columns, run on this page.</p>
       </div>
-      <div class="table-wrap"><table class="versus">
+      <div class="table-wrap"><table class="versus stack">
         <thead><tr><th></th><th>Light wallet today</th><th>Zylem, full Rings</th><th>Zylem, Rings with a proof</th></tr></thead>
         <tbody>
-          <tr><td>Who you trust for balances and payments</td><td><span class="no">The light-wallet server</span></td><td><span class="yes">No one: your device checks</span></td><td><span class="yes">No one for the contents</span>; SP1 and two pinned programs for the headers</td></tr>
+          <tr><td>Who you trust for balances and payments</td><td><span class="no">The light-wallet server</span></td><td><span class="yes">No data server</span>; your device verifies, from a checkpoint and the cryptography</td><td><span class="yes">No data server</span>; your device verifies, also relying on SP1 and two pinned programs for the headers</td></tr>
           <tr><td>Proof of work and difficulty</td><td><span class="no">Not checked</span></td><td><span class="yes">Every header</span></td><td><span class="yes">Every header, inside the proof</span></td></tr>
           <tr><td>Transaction IDs</td><td><span class="no">Not rebuilt</span>; compact data alone cannot rebuild them</td><td><span class="yes">Rebuilt and matched to the Merkle root</span></td><td><span class="yes">Rebuilt and matched to the proven Merkle root</span></td></tr>
           <tr><td>A fake incoming payment</td><td><span class="no">Shown as received</span></td><td><span class="yes">Refused</span> (step 4)</td><td><span class="yes">Refused</span></td></tr>
@@ -274,32 +396,92 @@ const hexToBytes = (h) => new Uint8Array(h.match(/../g).map((b) => parseInt(b, 1
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 const cache = new Map();
-async function fetchBytes(path) {
+// Reads a response to the end, reporting progress when the size is known.
+async function readAll(res, onProgress) {
+  const total = Number(res.headers.get("content-length")) || 0;
+  if (!res.body || !onProgress) return new Uint8Array(await res.arrayBuffer());
+  const reader = res.body.getReader(), parts = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value); got += value.length;
+    onProgress(got, total);
+  }
+  const out = new Uint8Array(got);
+  let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.length; }
+  return out;
+}
+async function fetchBytes(path, onProgress) {
   if (cache.has(path)) return cache.get(path);
   const res = await fetch(path);
   if (!res.ok) throw new Error(`${path}: ${res.status}`);
-  let bytes;
+  let bytes = await readAll(res, onProgress);
   if (path.endsWith(".b64.txt")) {
-    const s = atob((await res.text()).trim());
+    const s = atob(new TextDecoder().decode(bytes).trim());
     bytes = new Uint8Array(s.length);
     for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
-  } else bytes = new Uint8Array(await res.arrayBuffer());
+  }
   cache.set(path, bytes);
   return bytes;
 }
+
+// Downloads are on request: the verifier and the first Ring load when the visitor asks.
+let loading = null;
+function progress(label, got, total) {
+  // Once the first Ring is open, later downloads report beside the Ring choice.
+  if ($("start").hidden) { $("ring-load").textContent = total ? `${label}: ${mb(got)} of ${mb(total)}` : `${label}…`; return; }
+  $("progress").hidden = false;
+  $("pfill").style.width = total ? `${Math.min(100, (100 * got) / total).toFixed(1)}%` : "100%";
+  $("ptext").textContent = total ? `${label}: ${mb(got)} of ${mb(total)}` : `${label}…`;
+}
+function ensureLoaded() {
+  loading ??= (async () => {
+    $("load").disabled = true;
+    const wasm = await fetchBytes("./pkg/zylem_wasm_verify_bg.wasm", (g, t) => progress("Downloading the verifier", g, t || FILES.wasm_bytes));
+    await init({ module_or_path: wasm });
+    await pick("payment");
+    $("start").hidden = true;
+    $("ring-body").hidden = false;
+    $("status").innerHTML = `<span>Verifier <b>${mb(FILES.wasm_bytes)}</b> of WebAssembly</span><span>Rings <b>2 × 4,096 blocks</b></span><span>Proofs <b>2</b>, made on an RTX 5090</span><span>Network <b>Zcash testnet</b>, NU7 and Ironwood</span>`;
+    renderVersus();
+    complete(1);
+  })().catch((e) => { loading = null; $("load").disabled = false; $("ptext").textContent = `Could not load: ${e.message || e}. Try again.`; throw e; });
+  return loading;
+}
+
+// Steps open in order; "Show all steps" opens every one for readers who want it all.
+const doneSteps = new Set();
+function renderSteps() {
+  const next = [1, 2, 3, 4, 5].find((n) => !doneSteps.has(n)) ?? 5;
+  document.querySelectorAll("#stepbar li").forEach((li) => {
+    const n = Number(li.dataset.step);
+    li.classList.toggle("done", doneSteps.has(n));
+    li.classList.toggle("current", n === next && !doneSteps.has(n));
+  });
+  document.querySelectorAll("section.step").forEach((sec) => sec.classList.toggle("done", doneSteps.has(Number(sec.dataset.step))));
+}
+function openStep(n) { document.querySelector(`section.step[data-step="${n}"]`)?.classList.remove("locked"); }
+function complete(n) { doneSteps.add(n); openStep(n + 1); renderSteps(); }
+$("show-all").addEventListener("click", () => { [2, 3, 4, 5].forEach(openStep); $("show-all").hidden = true; });
+document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => openStep(Number(b.dataset.open))));
 
 function show(el, ok, title, detail) {
   el.className = "result " + (ok ? "ok" : "bad");
   el.innerHTML = `<span class="verdict">${ok ? "Verified" : "Refused"}</span>${title}${detail ? `<div style="margin-top:6px">${detail}</div>` : ""}`;
 }
 function info(el, html) { el.className = "result"; el.innerHTML = html; }
-function kv(rows) { return `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`; }
+const hx = (v) => String(v).replace(/\b(0x)?[0-9a-f]{32,}\b/g, (m) => `<span class="h">${m}</span>`);
+function kv(rows) { return `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${hx(v)}</dd>`).join("")}</dl>`; }
+// A passed check leaves its button in a settled "verified" state.
+const mark = (btn, ok) => btn.classList.toggle("is-verified", !!ok);
 function timed(f) {
   const t = performance.now();
   try { return { ok: true, value: f(), ms: performance.now() - t }; }
   catch (e) { return { ok: false, error: e.message || String(e), ms: performance.now() - t }; }
 }
-async function busy(btn, f) { btn.disabled = true; await tick(); try { return await f(); } finally { btn.disabled = false; } }
+async function busy(btn, f) { btn.disabled = true; await tick(); try { await ensureLoaded(); return await f(); } finally { btn.disabled = false; } }
 
 // Rings ---------------------------------------------------------------------------------
 const rings = {};
@@ -308,9 +490,8 @@ let current = null, currentKey = "payment", selected = null, verified = new Set(
 async function openRing(key) {
   if (rings[key]) return rings[key];
   const f = FILES.rings[key];
-  $("ring-load").textContent = `downloading ${mb(f.bytes)}…`;
   const t0 = performance.now();
-  const bytes = await fetchBytes(f.file);
+  const bytes = await fetchBytes(f.file, (g, t) => progress(`Downloading blocks ${fmt(f.from)}–${fmt(f.to)}`, g, t || f.bytes));
   const t1 = performance.now();
   const ring = new zv.RingFile(bytes);
   const t2 = performance.now();
@@ -320,7 +501,7 @@ async function openRing(key) {
 
 async function pick(key) {
   currentKey = key;
-  for (const k of ["payment", "proven"]) $("pick-" + k).setAttribute("aria-pressed", String(k === key));
+  for (const k of ["payment", "proven"]) { $("pick-" + k).setAttribute("aria-checked", String(k === key)); $("pick-" + k).tabIndex = k === key ? 0 : -1; }
   current = await openRing(key);
   const s = current.summary;
   $("ring-load").textContent = `${mb(s.bytes.file)} file · fetched in ${ms(current.fetchMs)} · decoded in ${ms(current.openMs)}`;
@@ -344,6 +525,8 @@ async function pick(key) {
   $("verify-result").className = "result";
   $("verify-result").innerHTML = verified.has(key) ? "Checked earlier on this page. Run it again to time it." : "";
   $("checks").className = verified.has(key) ? "checks done" : "checks";
+  verifiedButton(verified.has(key));
+  mark($("find"), false);
   for (const a of ["inject", "hide", "tree"]) $("atk-" + a).innerHTML = "";
   $("find-result").innerHTML = "";
 }
@@ -393,6 +576,7 @@ function drawBlocks() {
 }
 
 $("blocks").addEventListener("click", (e) => {
+  $("inspect").open = true;
   const r = e.currentTarget.getBoundingClientRect();
   const per = current.blocks.length / Math.max(1, Math.floor(r.width));
   const x = Math.floor(e.clientX - r.left);
@@ -414,7 +598,7 @@ function showBlock(height) {
     ["Height", fmt(b.height)], ["Block hash", b.hash], ["Previous", b.prev_hash], ["Merkle root", b.merkle_root],
     ["Block commitments", b.block_commitments], ["Time", new Date(b.time * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC"],
     ["Difficulty bits", b.bits], ["Ironwood root after", b.roots_after.ironwood], ["IDs rebuilt", `${b.transactions.length} in ${ms(r.ms)}, Merkle root matches`],
-  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${hx(v)}</dd>`).join("");
   const cell = (n, extra) => (n ? fmt(n) + (extra || "") : "<span class='muted'>–</span>");
   $("tx-rows").innerHTML = b.transactions.map((t) => {
     const mark = currentKey === "payment" && b.height === DEMO.height && t.index === DEMO.tx;
@@ -436,6 +620,13 @@ $("show-block").addEventListener("click", () => showBlock($("height").value));
 $("height").addEventListener("keydown", (e) => e.key === "Enter" && showBlock($("height").value));
 $("pick-payment").addEventListener("click", () => busy($("pick-payment"), () => pick("payment")));
 $("pick-proven").addEventListener("click", () => busy($("pick-proven"), () => pick("proven")));
+// Arrow keys move between the two Ring choices, as in any radio group.
+document.querySelector(".seg").addEventListener("keydown", (e) => {
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+  e.preventDefault();
+  const to = currentKey === "payment" ? "proven" : "payment";
+  $("pick-" + to).focus(); $("pick-" + to).click();
+});
 
 // Step 2 ---------------------------------------------------------------------------------
 async function verifyRing() {
@@ -444,11 +635,13 @@ async function verifyRing() {
   await tick();
   const r = timed(() => JSON.parse(current.ring.verify()));
   $("verify-busy").textContent = "";
+  verifiedButton(r.ok);
   if (r.ok) {
     verified.add(currentKey);
+    complete(2);
     $("checks").className = "checks done";
     const v = r.value;
-    show($("verify-result"), true, `all ${fmt(v.blocks)} blocks and ${fmt(v.transactions)} transactions, in ${ms(r.ms)} in this browser`, kv([
+    show($("verify-result"), true, `all ${fmt(v.blocks)} blocks and ${fmt(v.transactions)} transactions, checked locally in ${(r.ms / 1000).toFixed(1)} s without trusting the host that served them`, kv([
       ["Heights", `${fmt(v.start_height)} to ${fmt(v.end_height)}`],
       ["Difficulty rules checked from", v.difficulty_checked_from ? fmt(v.difficulty_checked_from) : "not reached"],
       ["Tree roots authenticated to", fmt(v.authenticated_to)],
@@ -462,12 +655,21 @@ async function verifyRing() {
   return r.ok;
 }
 $("verify").addEventListener("click", () => busy($("verify"), verifyRing));
+$("verify-again").addEventListener("click", () => busy($("verify-again"), verifyRing));
+// After a pass the main button reads "Verified" and a quieter button reruns the check.
+function verifiedButton(ok) {
+  mark($("verify"), ok);
+  $("verify").textContent = ok ? "Verified" : "Check this Ring";
+  $("verify-again").hidden = !ok;
+}
 
 // Step 3 ---------------------------------------------------------------------------------
 $("find").addEventListener("click", () => busy($("find"), async () => {
   if (!verified.has(currentKey) && !(await verifyRing())) return;
   const id = $("txid").value.trim().toLowerCase();
   const r = timed(() => JSON.parse(current.ring.find_tx(id)));
+  mark($("find"), r.ok);
+  complete(3);
   if (!r.ok) {
     $("find-result").className = "result bad";
     $("find-result").innerHTML = `<span class="verdict">Not found</span>No transaction in blocks ${fmt(current.summary.start_height)}–${fmt(current.summary.end_height)} has this ID. All ${fmt(current.summary.transactions)} IDs here were rebuilt from the Ring's own data, so a server cannot make a payment appear that is not in an authenticated block.` +
@@ -511,8 +713,13 @@ document.querySelectorAll("[data-attack]").forEach((btn) => btn.addEventListener
   const r = timed(() => bad.verify());
   bad.free();
   if (r.ok) { el.className = "result bad"; el.innerHTML = `<span class="verdict">Accepted</span>${esc(what)}. This should never happen.`; }
-  else { el.className = "result ok"; el.innerHTML = `<span class="verdict">Caught</span>${esc(r.error)}<div class="muted" style="margin-top:6px">The copy ${esc(what)}; refused in ${ms(r.ms)}.</div>`; }
+  else { el.className = "result ok"; el.innerHTML = `<span class="verdict">Caught</span>${esc(r.error)}<div class="muted" style="margin-top:6px">The simulated copy ${esc(what)}; refused in ${ms(r.ms)}.</div>`; complete(4); }
+  $("atk-reset").hidden = false;
 })));
+$("atk-reset").addEventListener("click", () => {
+  for (const a of ["inject", "hide", "tree"]) { $("atk-" + a).className = "result"; $("atk-" + a).innerHTML = ""; }
+  $("atk-reset").hidden = true;
+});
 
 // Step 5 ---------------------------------------------------------------------------------
 const P = TRUST.programs;
@@ -533,8 +740,8 @@ async function verifyProof(key, el) {
   return r;
 }
 const timesFor = {};
-$("smoke-verify").addEventListener("click", () => busy($("smoke-verify"), async () => { const r = await verifyProof("smoke", $("smoke-result")); if (r.ok) { timesFor.proof = r.ms; $("v-mobile").textContent = ms(r.ms); renderCompare(); } }));
-$("shard-verify").addEventListener("click", () => busy($("shard-verify"), async () => { const r = await verifyProof("shard0", $("shard-result")); if (r.ok) $("v-mobile").textContent = ms(r.ms); }));
+$("smoke-verify").addEventListener("click", () => busy($("smoke-verify"), async () => { const r = await verifyProof("smoke", $("smoke-result")); mark($("smoke-verify"), r.ok); if (r.ok) complete(5); if (r.ok) { timesFor.proof = r.ms; $("v-mobile").textContent = ms(r.ms); renderCompare(); } }));
+$("shard-verify").addEventListener("click", () => busy($("shard-verify"), async () => { const r = await verifyProof("shard0", $("shard-result")); mark($("shard-verify"), r.ok); if (r.ok) $("v-mobile").textContent = ms(r.ms); }));
 $("smoke-bind").addEventListener("click", () => busy($("smoke-bind"), async () => {
   const f = FILES.proofs.smoke;
   const { pv } = await proofParts("smoke");
@@ -543,6 +750,7 @@ $("smoke-bind").addEventListener("click", () => busy($("smoke-bind"), async () =
   const m = timed(() => JSON.parse(zv.check_all_records(pv, recs.value)));
   const hdr = timed(() => proven.ring.check_headers(f.from, f.to));
   timesFor.headers = hdr.ms; timesFor.match = recs.ms + m.ms; renderCompare();
+  mark($("smoke-bind"), m.ok);
   if (m.ok) show($("bind-result"), true, `the Ring's blocks ${fmt(f.from)}–${fmt(f.to)} are exactly the ones the proof commits to, in ${ms(recs.ms + m.ms)}`,
     `Checking those ${fmt(f.to - f.from + 1)} headers' Equihash and links directly instead took ${ms(hdr.ms)} here.`);
   else show($("bind-result"), false, "", `<span class="mono">${esc(m.error)}</span>`);
@@ -551,6 +759,8 @@ $("smoke-groth").addEventListener("click", () => busy($("smoke-groth"), async ()
   const f = FILES.proofs.smoke;
   const [g, pv] = await Promise.all([fetchBytes(f.groth16), fetchBytes(f.public_values)]);
   const r = timed(() => zv.verify_groth16(g, pv, P.agg_bytes32));
+  mark($("smoke-groth"), r.ok);
+  if (r.ok) complete(5);
   if (r.ok) {
     $("v-chain").textContent = ms(r.ms);
     const { proof } = await proofParts("smoke");
@@ -561,7 +771,7 @@ $("smoke-groth").addEventListener("click", () => busy($("smoke-groth"), async ()
       ["Total work", "0x" + c.work.replace(/^0+/, "")],
       ["Equihash", c.equihash_checked ? "checked for every header" : "not checked"],
       ["Program key it checks against", P.agg_bytes32],
-    ]) + `<div class="muted" style="margin-top:6px">Wallets use the 1.27 MB form instead: it needs no trusted setup and verifies faster off-chain.</div>`);
+    ]) + `<div class="muted" style="margin-top:6px">The same claim as the 1.27 MB proof, about 3,600 times smaller. A wallet can take either: this one saves bandwidth on every update, the larger one avoids the trusted setup.</div>`);
   }
   else show($("groth-result"), false, "", `<span class="mono">${esc(r.error)}</span>`);
 }));
@@ -580,7 +790,7 @@ $("rec-show").addEventListener("click", () => busy($("rec-show"), async () => {
 function renderVersus() {
   const r = FILES.rings.payment;
   $("vs-full").textContent = `${mb(r.bytes)} Ring`;
-  $("vs-proof").textContent = `${mb(r.light_bytes)} light Ring + a share of one ${mb(cache.get(FILES.proofs.smoke.proof)?.length ?? 1272546)} proof`;
+  $("vs-proof").textContent = `${mb(r.light_bytes)} light Ring + a share of one proof (356 bytes)`;
   if (current) $("vs-light").textContent = `about ${mb(current.summary.bytes.compact_blocks)} of compact blocks`;
 }
 
@@ -590,10 +800,10 @@ function renderCompare() {
   const s = FILES.proofs.shard0, n0 = s.to - s.from + 1;
   const t = (v) => (v == null ? "<span class='muted'>run step 5</span>" : ms(v));
   $("compare").innerHTML = [
-    [`Download for ${fmt(n)} blocks`, mb(n * HEADER_BYTES) + " of headers", `${mb(proofBytes)} proof + ${mb(n * RECORD_BYTES)} of records`],
-    [`Time for ${fmt(n)} blocks, this browser`, t(timesFor.headers), timesFor.proof == null ? t(null) : `${ms(timesFor.proof)} for the proof + ${ms(timesFor.match ?? 0)} to match the Ring`],
+    [`Download for ${fmt(n)} blocks`, mb(n * HEADER_BYTES) + " of headers", `356-byte proof (or ${mb(proofBytes)} without a trusted setup) + ${mb(n * RECORD_BYTES)} of records`],
+    [`Time for ${fmt(n)} blocks, this browser`, t(timesFor.headers), timesFor.proof == null ? t(null) : `${ms(timesFor.proof)} for the proof` + (timesFor.match == null ? ", then match the Ring" : ` + ${ms(timesFor.match)} to match the Ring`)],
     ["One Ring of 4,096 blocks", mb(FILES.rings.payment.bytes) + " (full headers)", `${mb(FILES.rings.payment.light_bytes)} with records instead of headers, plus one proof shared by every Ring it covers`],
-    [`Download for ${fmt(n0)} blocks (NU7 proof)`, mb(n0 * HEADER_BYTES) + " of headers", `${mb(proofBytes)} proof + ${mb(n0 * RECORD_BYTES)} of records`],
+    [`Download for ${fmt(n0)} blocks (NU7 proof)`, mb(n0 * HEADER_BYTES) + " of headers", `one proof + ${mb(n0 * RECORD_BYTES)} of records`],
     ["Trusts", "the cryptography and a checkpoint", "also SP1 and the two pinned programs"],
   ].map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("");
 }
@@ -601,7 +811,17 @@ function renderCompare() {
 // Start -----------------------------------------------------------------------------------
 async function main() {
   try {
-    await init({ module_or_path: "./pkg/zylem_wasm_verify_bg.wasm" });
+    // Results are announced to screen readers as they change.
+    document.querySelectorAll(".result").forEach((el) => { el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite"); });
+    // Comparison tables carry their column names so phones can show one card per row.
+    document.querySelectorAll("table.stack").forEach((t) => {
+      const names = [...t.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+      new MutationObserver(() => label(t, names)).observe(t.tBodies[0], { childList: true });
+      label(t, names);
+    });
+    $("load-note").textContent = `${mb(FILES.rings.payment.bytes + FILES.wasm_bytes)}: the ${mb(FILES.rings.payment.bytes)} Ring and the ${mb(FILES.wasm_bytes)} verifier, from this page's host`;
+    $("load").addEventListener("click", () => ensureLoaded());
+    renderSteps();
     const s = FILES.proofs.smoke, z = FILES.proofs.shard0;
     $("smoke-desc").textContent = `${fmt(s.to - s.from + 1)} headers, ${fmt(s.from)}–${fmt(s.to)}, proved as ${s.leaves} leaves of 512 on an RTX 5090, with Equihash. They sit inside the second Ring.`;
     $("shard-desc").textContent = `${fmt(z.to - z.from + 1)} headers, ${fmt(z.from)}–${fmt(z.to)}, the first ${z.leaves} leaves after NU7 activated, joined into one proof.`;
@@ -611,14 +831,15 @@ async function main() {
       ["Leaf program", P.leaf_bytes32], ["Aggregation program", P.agg_bytes32],
       ["NU7 proof starts after", `${fmt(TRUST.shard0.anchor.height)} · ${TRUST.shard0.anchor.display}`],
       ["Newest-blocks proof starts after", `${fmt(TRUST.smoke.anchor.height)} · ${TRUST.smoke.anchor.display}`],
-    ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    ].map(([k, v]) => `<dt>${k}</dt><dd>${hx(v)}</dd>`).join("");
     renderCompare();
-    await pick("payment");
-    renderVersus();
-    $("status").innerHTML = `<span>Verifier <b>${mb(FILES.wasm_bytes)}</b> of WebAssembly</span><span>Rings <b>2 × 4,096 blocks</b></span><span>Proofs <b>2</b>, made on an RTX 5090</span><span>Network <b>Zcash testnet</b>, NU7 and Ironwood</span>`;
+    $("status").innerHTML = `<span>Nothing downloaded yet</span><span>Rings <b>2 × 4,096 blocks</b></span><span>Proofs <b>2</b>, made on an RTX 5090</span><span>Network <b>Zcash testnet</b>, NU7 and Ironwood</span>`;
   } catch (e) {
     $("status").innerHTML = `<span class="mono">Could not start: ${esc(e.message || e)}</span>`;
   }
+}
+function label(t, names) {
+  for (const tr of t.tBodies[0].rows) [...tr.cells].forEach((td, i) => { if (names[i]) td.dataset.label = names[i]; });
 }
 main();
 </script>

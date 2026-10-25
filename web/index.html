@@ -1,0 +1,877 @@
+<title>Zylem - verifiable Zcash block data</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a left-set editorial column; the hero pairs the thesis with a tree-ring cross-section whose rings are real testnet Rings. */
+:root {
+  --paper: #f1f4ef;
+  --paper-2: #e7ece5;
+  --ink: #142019;
+  --muted: #56645b;
+  --rule: #d3dbd2;
+  --ring: #8b9b90;
+  --accent: #1d6b47;
+  --accent-tint: #d4ebdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --measure: 62ch;
+  --wide: 1120px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b;
+    --ring: #4f6458; --accent: #6fd2a0; --accent-tint: #173627; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b;
+  --ring: #4f6458; --accent: #6fd2a0; --accent-tint: #173627; color-scheme: dark;
+}
+
+body { background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--body); }
+.wrap {
+  max-width: var(--wide); margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h2 { font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 800; line-height: 1.08; letter-spacing: -0.01em; }
+h3 { font-size: 1.15rem; font-weight: 600; line-height: 1.3; }
+p { margin: 0; }
+.eyebrow { font: 500 0.78rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { max-width: var(--measure); color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Top bar */
+.top { padding-block: 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.mark { display: flex; align-items: center; gap: 10px; font: 800 1.25rem/1 var(--display); color: var(--ink); text-decoration: none; }
+.mark svg { width: 26px; height: 26px; }
+.top nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.95rem; }
+.top nav a { color: var(--muted); text-decoration: none; }
+.top nav a:hover { color: var(--ink); }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 40px; align-items: center; padding-block: 40px 56px; }
+.hero h1 { font-size: clamp(2.5rem, 6vw, 4.6rem); font-weight: 800; line-height: 0.98; letter-spacing: -0.025em; margin-block: 16px 22px; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero .lede { font-size: 1.1rem; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 999px; font: 600 0.95rem/1 var(--body); text-decoration: none; border: 1.5px solid var(--accent); }
+.btn.solid { background: var(--accent); color: var(--paper); }
+.btn.ghost { color: var(--accent); }
+.figure { min-width: 0; }
+.figure canvas { width: 100%; max-width: 100%; aspect-ratio: 1 / 1; display: block; }
+.figure figcaption { font-size: 0.85rem; color: var(--muted); max-width: 46ch; margin-top: 8px; }
+
+/* Facts strip */
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.fact { padding: 22px 20px 22px 0; display: grid; gap: 4px; min-width: 0; }
+.fact + .fact { padding-left: 20px; border-left: 1px solid var(--rule); }
+.fact b { font: 800 clamp(1.6rem, 3vw, 2.2rem)/1 var(--display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 0.92rem; color: var(--muted); }
+
+section { padding-block: 72px; }
+section + section { border-top: 1px solid var(--rule); }
+.head { display: grid; gap: 14px; margin-bottom: 36px; }
+
+/* Attacks table */
+.attacks { width: 100%; border-collapse: collapse; font-size: 0.98rem; }
+.attacks th { text-align: left; font: 500 0.75rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0 16px 12px 0; border-bottom: 1px solid var(--rule); }
+.attacks td { padding: 18px 16px 18px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.attacks td:first-child { font-weight: 600; width: 28%; }
+.attacks td:nth-child(2) { color: var(--muted); width: 30%; }
+.verdict { display: inline-block; font: 500 0.72rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); background: var(--accent-tint); padding: 5px 8px; border-radius: 4px; margin-bottom: 6px; }
+.scroll { overflow-x: auto; }
+
+/* Chain of checks */
+.chain { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; position: relative; }
+.link { padding: 22px 22px 22px 0; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.link + .link { padding-left: 22px; border-left: 1px solid var(--rule); }
+.link .tag { font: 500 0.75rem/1.2 var(--mono); color: var(--accent); letter-spacing: 0.04em; }
+.link p { color: var(--muted); font-size: 0.95rem; }
+.arrowline { grid-column: 1 / -1; height: 1px; background: var(--rule); position: relative; margin-bottom: 6px; }
+.chain-note { margin-top: 26px; max-width: var(--measure); color: var(--muted); }
+
+/* Two-up blocks */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.stack { display: grid; gap: 16px; }
+.numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.numbers div { background: var(--paper); padding: 18px; display: grid; gap: 4px; min-width: 0; }
+.numbers b { font: 800 1.6rem/1.05 var(--display); font-variant-numeric: tabular-nums; }
+.numbers span { font-size: 0.88rem; color: var(--muted); }
+
+/* How it's made: three processes, each a row of steps that stacks on phones */
+.procs { display: grid; gap: 56px; }
+.proc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 18px; }
+.proc-head h3 { font-size: 1.4rem; font-weight: 800; }
+.proc-head p { color: var(--muted); flex: 1 1 320px; min-width: 0; }
+.cadence { font: 500 0.75rem/1.3 var(--mono); color: var(--accent); background: var(--accent-tint); padding: 5px 8px; border-radius: 4px; white-space: nowrap; }
+.diagram { margin: 0; overflow-x: auto; }
+.diagram svg { width: 100%; min-width: 860px; height: auto; display: block; }
+.diagram figcaption { margin-top: 10px; font-size: 0.88rem; color: var(--muted); max-width: var(--measure); position: sticky; left: 0; }
+.dg .t { font: 600 14px var(--display); fill: var(--ink); }
+.dg .t2 { font: 600 12.5px var(--display); fill: var(--ink); }
+.dg .s { font: 400 12px var(--body); fill: var(--muted); }
+.dg .m { font: 500 11.5px var(--mono); fill: var(--ink); }
+.dg .k { font: 500 11px var(--mono); fill: var(--accent); letter-spacing: 0.06em; }
+.dg .line { fill: none; stroke: var(--ring); stroke-width: 1.5; }
+.dg .thin { fill: none; stroke: var(--rule); stroke-width: 1.25; }
+.dg .box { fill: var(--paper); stroke: var(--ring); stroke-width: 1.25; }
+.dg .soft { fill: var(--paper-2); stroke: var(--rule); stroke-width: 1; }
+.dg .hi { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 2; }
+.dg .acc { fill: none; stroke: var(--accent); stroke-width: 2; }
+.dg .dash { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 5; }
+.dg .ah { fill: var(--ring); }
+.dg .ah2 { fill: var(--accent); }
+.dg .hot { fill: var(--accent); }
+.dg .tick { fill: var(--ring); opacity: 0.55; }
+.dg .tick2 { fill: var(--accent); opacity: 0.7; }
+.dg .phone { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 2; }
+.dg .screen { fill: var(--paper); }
+.dg .check { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.proc-note { margin-top: 14px; font-size: 0.9rem; color: var(--muted); max-width: var(--measure); }
+.values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 32px; margin-top: 48px; }
+.value { display: grid; gap: 6px; align-content: start; min-width: 0; padding-top: 14px; border-top: 2px solid var(--accent); }
+.value p { color: var(--muted); font-size: 0.95rem; }
+
+/* Trust */
+.trust { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; }
+.trust ul { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+.trust li { padding-left: 22px; position: relative; }
+.trust li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ring); }
+.trust .yes li::before { background: var(--accent); border-color: var(--accent); }
+.trust .caveat { margin-top: 28px; grid-column: 1 / -1; color: var(--muted); max-width: var(--measure); font-size: 0.95rem; }
+
+/* Status */
+.status { list-style: none; margin: 0; padding: 0; display: grid; }
+.status li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+.pill { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; justify-self: start; }
+.pill.done { color: var(--accent); background: var(--accent-tint); }
+.pill.next { color: var(--paper); background: var(--accent); }
+.pill.later { color: var(--muted); border: 1px solid var(--rule); }
+.status small { display: block; color: var(--muted); font-size: 0.9rem; }
+
+/* Try it */
+.cmds { display: grid; gap: 14px; }
+.cmd { border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-2); overflow: hidden; }
+.cmd header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
+.cmd pre { margin: 0; padding: 14px; overflow-x: auto; font: 400 0.86rem/1.6 var(--mono); color: var(--ink); }
+.copy { font: 500 0.8rem/1 var(--body); color: var(--accent); background: none; border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.copy:hover { border-color: var(--accent); }
+.note { font-size: 0.92rem; color: var(--muted); max-width: var(--measure); }
+
+footer { border-top: 1px solid var(--rule); padding-block: 28px 40px; color: var(--muted); font-size: 0.88rem; display: flex; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .hero, .split, .trust { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding-block: 16px 40px; gap: 24px; }
+  .figure { max-width: 460px; }
+  .chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .link:nth-child(3) { padding-left: 0; border-left: 0; }
+  .link:nth-child(n+3) { border-top: 1px solid var(--rule); }
+}
+@media (max-width: 860px) {
+  .values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .values { grid-template-columns: minmax(0, 1fr); }
+  body { font-size: 16px; }
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .fact, .fact + .fact { padding: 16px 0; border-left: 0; }
+  .fact + .fact { border-top: 1px solid var(--rule); }
+  .chain { grid-template-columns: minmax(0, 1fr); }
+  .link, .link + .link { padding: 18px 0; border-left: 0; }
+  .link + .link { border-top: 1px solid var(--rule); }
+  .numbers { grid-template-columns: minmax(0, 1fr); }
+  .status li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  section { padding-block: 52px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+
+/* Hero extras */
+.points { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 6px; }
+.points li { padding-left: 24px; position: relative; }
+.points li::before { content: ""; position: absolute; left: 2px; top: 0.42em; width: 10px; height: 5px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg); }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.badges span { font: 500 0.74rem/1 var(--mono); padding: 6px 10px; border: 1px solid var(--rule); border-radius: 999px; color: var(--muted); }
+
+/* Attack demo */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.tabs button { font: 600 0.92rem/1 var(--body); padding: 10px 15px; border-radius: 999px; border: 1.5px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+.tabs button:hover { border-color: var(--accent); }
+.tabs button[aria-selected="true"] { border-color: var(--accent); background: var(--accent); color: var(--paper); }
+.panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.panel .col { padding: 20px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.panel .col + .col { border-left: 1px solid var(--rule); }
+.panel .zylem { background: var(--accent-tint); }
+.col-k { font: 500 0.72rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.panel .err { grid-column: 1 / -1; border-top: 1px solid var(--rule); padding: 14px 20px; display: grid; gap: 6px; background: var(--paper-2); min-width: 0; }
+.panel .err code { font: 400 0.84rem/1.5 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.panel .caution { grid-column: 1 / -1; padding: 12px 20px; border-top: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
+.demo .note { margin-top: 14px; }
+.flow svg { min-width: 720px; }
+.more { margin-top: 22px; }
+.dg .ring { fill: none; stroke: var(--ring); stroke-width: 1.25; }
+.dg .dot { fill: var(--ring); }
+
+/* Benchmarks */
+.bench { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.bench > div { background: var(--paper); padding: 20px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.bench b { font: 800 clamp(1.9rem, 3.2vw, 2.5rem)/1 var(--display); font-variant-numeric: tabular-nums; }
+.bench span:not(.col-k) { font-size: 0.9rem; color: var(--muted); }
+.bench a { font-size: 0.85rem; }
+
+/* Quickstart and details */
+.cmd header b { font-family: var(--mono); color: var(--accent); margin-right: 6px; }
+.cmd.out pre { color: var(--muted); }
+.tag-ex { font: 500 0.72rem/1 var(--mono); color: var(--muted); }
+.details { display: grid; gap: 10px; }
+details { border: 1px solid var(--rule); border-radius: 10px; padding: 0 18px; background: var(--paper); }
+details[open] { padding-bottom: 22px; }
+summary { cursor: pointer; padding: 16px 0; font: 600 1.05rem/1.3 var(--display); }
+.detail-p { color: var(--muted); max-width: var(--measure); }
+@media (max-width: 860px) {
+  .panel { grid-template-columns: minmax(0, 1fr); }
+  .panel .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+  .bench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .bench { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Data layer */
+.pillars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 36px; }
+.pillar { border-top: 2px solid var(--accent); padding-top: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.pillar-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.pillar h3 { font-size: 1.4rem; font-weight: 800; }
+.pillar p { color: var(--muted); font-size: 0.95rem; }
+.chip { font: 500 0.7rem/1 var(--mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; white-space: nowrap; }
+.chip.on { color: var(--accent); background: var(--accent-tint); }
+.chip.next { color: var(--paper); background: var(--accent); }
+.chip.later { color: var(--muted); border: 1px solid var(--rule); }
+.dg .pill-on { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 1; }
+.dg .pill-next { fill: var(--accent); }
+.dg .pill-later { fill: none; stroke: var(--ring); stroke-width: 1; }
+.dg .pt-on { font: 500 10.5px var(--mono); fill: var(--accent); }
+.dg .pt { font: 500 10.5px var(--mono); fill: var(--muted); }
+.dg .pill-next + .pt { fill: var(--paper); }
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.97rem; min-width: 560px; }
+.tbl th { text-align: left; font: 500 0.75rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0 16px 12px 0; border-bottom: 1px solid var(--rule); }
+.tbl td { padding: 14px 16px 14px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.tbl td:first-child { font-weight: 600; width: 30%; }
+.tbl td:nth-child(2) { color: var(--muted); }
+@media (max-width: 860px) { .pillars { grid-template-columns: minmax(0, 1fr); } }
+
+/* Where Zylem sits, proof modes */
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.95rem; min-width: 560px; }
+.tbl th, .tbl td { text-align: left; padding: 12px 14px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.tbl thead th { font: 500 0.72rem/1.25 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.spectrum { min-width: 680px; }
+.spectrum tbody th { font-weight: 600; width: 24%; }
+.spectrum td { color: var(--muted); width: 25%; }
+.spectrum td:nth-child(3) { color: var(--ink); background: var(--accent-tint); padding-left: 12px; }
+.spectrum thead th:nth-child(3) { color: var(--accent); padding-left: 12px; }
+.limits { margin-top: 28px; border-left: 2px solid var(--rule); padding-left: 18px; max-width: 72ch; }
+.limits h3 { font-size: 1.1rem; }
+.limits ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 8px; color: var(--muted); }
+.limits b { color: var(--ink); font-weight: 600; }
+.modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.mode { border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.mode.light { border-color: var(--accent); }
+.mode-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+.mode h3 { font-size: 1.3rem; font-weight: 800; }
+.mode p { color: var(--muted); }
+.mode ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 0.95rem; }
+.chip { font: 500 0.7rem/1 var(--mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; white-space: nowrap; }
+.chip.on { color: var(--accent); background: var(--accent-tint); }
+.chip.next { color: var(--paper); background: var(--accent); }
+.chip.later { color: var(--muted); border: 1px solid var(--rule); }
+@media (max-width: 860px) { .modes { grid-template-columns: minmax(0, 1fr); } }
+.spectrum td:first-child { font-weight: 400; width: 24%; }
+
+/* Visual-system refinements: bright green only for actions, verified states and selection;
+   three text levels; quieter borders; one radius scale (8 controls, 12 cards, pills only
+   for buttons and selectors). */
+:root { --text-3: #66746b; --accent-muted: #3d7a5c; --rule-soft: #e2e8e0; --r-control: 8px; --r-card: 12px; --r-pill: 999px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --text-3: #728078; --accent-muted: #4f9673; --rule-soft: #1c2a23; --rule: #26372e; --paper-2: #121c17; }
+}
+:root[data-theme="dark"] { --text-3: #728078; --accent-muted: #4f9673; --rule-soft: #1c2a23; --rule: #26372e; --paper-2: #121c17; }
+a { color: var(--accent-muted); }
+a:hover { color: var(--accent); }
+.btn.solid, .btn.solid:hover { color: var(--paper); }
+.btn.ghost:hover { color: var(--accent); background: var(--accent-tint); }
+.eyebrow, .col-k, .tbl thead th, .attacks thead th { font-size: 0.8rem; line-height: 1.4; color: var(--text-3); }
+.figure figcaption, .diagram figcaption, .note, .tag-ex, .status small, .proc-note, .facts-list span { color: var(--text-3); }
+.badges span { border-radius: 4px; font-size: 0.72rem; padding: 4px 8px; border-color: var(--rule-soft); color: var(--text-3); }
+.cmd { border-radius: var(--r-control); border-color: var(--rule-soft); }
+.cmd header { border-bottom-color: var(--rule-soft); }
+.copy { border-radius: var(--r-control); border-color: var(--rule-soft); }
+details, .numbers, .mode, .panel, .bench { border-radius: var(--r-card); }
+details, .mode:not(.light), .panel { border-color: var(--rule-soft); }
+.mode.light { border-color: var(--accent-muted); }
+.numbers, .bench { background: var(--rule-soft); border-color: var(--rule-soft); }
+section + section, footer { border-top-color: var(--rule-soft); }
+.tbl th, .tbl td, .attacks td, .status li, .facts-list li { border-bottom-color: var(--rule-soft); }
+.panel .col + .col, .fact + .fact, .link + .link { border-color: var(--rule-soft); }
+.spectrum td:nth-child(3) { background: color-mix(in srgb, var(--accent-tint) 40%, transparent); }
+.spectrum thead th:nth-child(3) { color: var(--accent); }
+.points li::before { border-color: var(--accent-muted); }
+.value, .pillar { border-top-color: var(--accent-muted); }
+.tabs button { border-color: var(--rule); }
+.tabs button:hover { border-color: var(--accent-muted); background: var(--paper-2); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tbl td, .bench b, .numbers b, .fact b, .facts-list b, .status { font-variant-numeric: tabular-nums; }
+.tbl tbody th { font: 600 0.95rem/1.45 var(--body); letter-spacing: 0; text-transform: none; color: var(--ink); }
+/* Comparison table: even spacing between columns, the Zylem column tinted from its header down. */
+.spectrum th:not(:first-child), .spectrum td { padding-left: 14px !important; padding-right: 14px; }
+.spectrum thead th:nth-child(3) { background: color-mix(in srgb, var(--accent-tint) 40%, transparent); border-radius: 8px 8px 0 0; }
+.spectrum thead th { vertical-align: bottom; }
+
+/* Navigation: five links on wide screens, one compact menu on phones. */
+.top { position: relative; }
+.top nav.primary { align-items: center; }
+.nav-cta { color: var(--accent) !important; font-weight: 600; border: 1.5px solid var(--accent-muted); border-radius: var(--r-pill); padding: 5px 12px; }
+.nav-cta:hover { background: var(--accent-tint); }
+details.menu { display: none; border: 0; padding: 0; background: none; }
+details.menu > summary { list-style: none; font: 600 0.95rem/1 var(--body); padding: 9px 14px; border: 1.5px solid var(--rule); border-radius: var(--r-pill); color: var(--ink); }
+details.menu > summary::-webkit-details-marker { display: none; }
+details.menu[open] > div { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: 64px; z-index: 20; display: grid; gap: 2px; min-width: 220px; padding: 8px; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--r-card); box-shadow: 0 12px 32px rgb(0 0 0 / 0.18); }
+details.menu[open] > div a { padding: 10px 12px; border-radius: var(--r-control); color: var(--ink); text-decoration: none; }
+details.menu[open] > div a:hover { background: var(--paper-2); }
+@media (max-width: 760px) {
+  .top nav.primary a:not(.nav-cta) { display: none; }
+  .top nav.primary { margin-left: auto; }
+  details.menu { display: block; }
+  .top { flex-wrap: nowrap; }
+}
+/* Tables become one card per row on phones; commands wrap inside their own box. */
+.cmds > * { min-width: 0; }
+@media (max-width: 640px) {
+  .scroll .tbl.cards { min-width: 0; }
+  .tbl.cards, .tbl.cards tbody, .tbl.cards tr, .tbl.cards th, .tbl.cards td { display: block; width: auto !important; }
+  .tbl.cards thead { display: none; }
+  .tbl.cards tr { padding: 14px 0; border-bottom: 1px solid var(--rule-soft); }
+  .tbl.cards th, .tbl.cards td { border: 0; padding: 3px 0 !important; background: none !important; }
+  .tbl.cards tr > :first-child { font-weight: 600; color: var(--ink); padding-bottom: 6px !important; }
+  .tbl.cards td[data-label]:not(:first-child)::before { content: attr(data-label); display: block; font: 500 0.74rem/1.4 var(--mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); }
+  .spectrum td:nth-child(3) { color: var(--ink); }
+  .spectrum td:nth-child(3)::before { color: var(--accent) !important; }
+  .cmd pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+}
+/* On phones the hero figure shrinks so the first action stays prominent. */
+@media (max-width: 860px) {
+  .hero .figure { max-width: 300px; margin-inline: auto; }
+  .hero .figure figcaption { display: none; }
+}
+@media (max-width: 560px) { .hero .figure { display: none; } }
+details { border: 1px solid var(--rule-soft); border-radius: var(--r-card); padding: 0 18px; background: var(--paper); }
+details[open] { padding-bottom: 22px; }
+details > summary { cursor: pointer; padding: 16px 0; font: 600 1.05rem/1.3 var(--display); }
+details.menu, details.menu[open] { border: 0; padding: 0; background: none; }
+.details { display: grid; gap: 10px; }
+.detail-p { color: var(--muted); max-width: var(--measure); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="#top" aria-label="Zylem home">
+      <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="13" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="13" r="3.5" fill="currentColor"/></svg>
+      Zylem
+    </a>
+    <nav class="primary" aria-label="Sections">
+      <a href="#attacks">Why Zylem</a>
+      <a href="#how">How it works</a>
+      <a href="#numbers">Performance</a>
+      <a href="#try">Developers</a>
+      <a class="nav-cta" href="/demo/">Live demo</a>
+    </nav>
+    <details class="menu">
+      <summary aria-label="All sections">Menu</summary>
+      <div>
+        <a href="#attacks">Why Zylem</a>
+        <a href="#sits">Where it sits</a>
+        <a href="#how">How it works</a>
+        <a href="#numbers">Performance</a>
+        <a href="#try">Developers</a>
+        <a href="#status">Status</a>
+        <a href="/how/">Technical details</a>
+        <a href="/demo/">Live demo</a>
+      </div>
+    </details>
+  </header>
+
+  <div class="hero" id="top">
+    <div>
+      <p class="eyebrow">A verifiable data layer for Zcash</p>
+      <h1>Don’t trust the server. <em>Verify every block with Zylem.</em></h1>
+      <p class="lede">Zylem separates who serves Zcash data from who you trust. History travels as portable Ring files, each about a day of blocks, that anyone can host, and every client checks what it receives before using it. Wallets are the first application.</p>
+      <ul class="points">
+        <li>No trusted server: every block is checked on your side</li>
+        <li>Any host can serve the history</li>
+        <li>No full node: Rings verify on their own, and proofs make them light enough for phones</li>
+      </ul>
+      <div class="actions">
+        <a class="btn solid" href="/demo/">Open the live demo</a>
+        <a class="btn ghost" href="#attacks">See what it rejects</a>
+        <a class="btn ghost" href="#try">Try it on testnet</a>
+      </div>
+      <p class="badges"><span>Testnet prototype</span><span>Works with Zakura</span><span>Header proofs in SP1</span></p>
+    </div>
+    <figure class="figure" aria-label="Tree-ring cross-section: each ring is one Ring of 4,096 testnet blocks">
+      <canvas id="rings" width="560" height="560"></canvas>
+      <figcaption>Each growth ring is a Ring: 4,096 testnet blocks in one file that anyone can host, because every block in it is re-verified. The outer dashed ring is the open tail, still growing.</figcaption>
+    </figure>
+  </div>
+
+  <section id="attacks">
+    <div class="head">
+      <p class="eyebrow">What it rejects</p>
+      <h2>See what Zylem rejects.</h2>
+      <p class="lede">Conventional light wallets rely on their server for their view of the chain. Pick a manipulation to see what a wallet shows today and what happens through Zylem.</p>
+    </div>
+    <div class="demo">
+      <div class="tabs" role="tablist" aria-label="Server manipulations">
+        <button type="button" role="tab" id="tab-fake" aria-controls="demo-panel" aria-selected="true" data-attack="fake">Fake payment</button>
+        <button type="button" role="tab" id="tab-hidden" aria-controls="demo-panel" aria-selected="false" tabindex="-1" data-attack="hidden">Hidden payment</button>
+        <button type="button" role="tab" id="tab-tree" aria-controls="demo-panel" aria-selected="false" tabindex="-1" data-attack="tree">Wrong tree state</button>
+        <button type="button" role="tab" id="tab-stale" aria-controls="demo-panel" aria-selected="false" tabindex="-1" data-attack="stale">Stale chain</button>
+      </div>
+      <div class="panel" id="demo-panel" role="tabpanel" aria-labelledby="tab-fake">
+        <div class="col"><span class="col-k">Malicious server</span><p id="d-server">Adds a note paying you to the compact data of a real block.</p></div>
+        <div class="col"><span class="col-k">A wallet today</span><p id="d-today">Shows funds that were never sent.</p></div>
+        <div class="col zylem"><span class="col-k">Through Zylem</span><p><span class="verdict" id="d-verdict">Rejected</span><br><span id="d-zylem">The altered transaction's rebuilt ID no longer matches what the block header committed to.</span></p></div>
+        <div class="err"><span class="col-k">Illustrative error</span><code id="d-error">REJECT Ring 4518274..=4522369 rejected: transaction 4 at height 4521980: rebuilt ID does not match</code></div>
+        <p class="caution" id="d-caution" hidden></p>
+      </div>
+      <p class="note">These are the manipulations Zylem's demo runs against an unmodified testnet wallet. Error lines follow Zylem's real format; the heights are illustrative.</p>
+    </div>
+  </section>
+
+  <section id="sits">
+    <div class="head">
+      <p class="eyebrow">Where Zylem sits</p>
+      <h2>Stronger than any light wallet, far lighter than a full node.</h2>
+      <p class="lede">A light wallet trusts its server; a full node checks everything and needs a server's worth of resources. Zylem checks every block you use on your own device, with one small proof standing in for every historical header.</p>
+    </div>
+    <div class="scroll">
+      <table class="tbl spectrum cards">
+        <thead><tr><th scope="col"></th><th scope="col">Light wallet today</th><th scope="col">Zylem, light Rings + proof</th><th scope="col">Full node</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Block data authentic and complete</th><td>Server's word</td><td>Checked on your side</td><td>Yes</td></tr>
+          <tr><th scope="row">Proof of work and difficulty</th><td>Not checked</td><td>Proven once; the proof checks in 50 to 350 ms</td><td>Yes</td></tr>
+          <tr><th scope="row">Transaction validity (proofs, signatures)</th><td>Not checked</td><td>Not yet; planned for transactions that touch you</td><td>Every transaction</td></tr>
+          <tr><th scope="row">Double spends and supply</th><td>Not checked</td><td>Not yet; planned supply guard and proven nullifier set</td><td>Yes</td></tr>
+          <tr><th scope="row">Served by any static host</th><td>No: each server runs a node</td><td>Yes</td><td>It is the source</td></tr>
+          <tr><th scope="row">Header data to download</th><td>None, unverified</td><td>One proof: 356 bytes, or 1.27 MB without a trusted setup</td><td>Everything, hundreds of GB unpruned</td></tr>
+          <tr><th scope="row">Runs on</th><td>Phones and browsers</td><td>Phones, browsers and, through the 356-byte proof, other chains</td><td>Servers and desktops</td></tr>
+          <tr><th scope="row">What you trust</th><td>The server</td><td>A checkpoint, honest-majority hashpower, SP1 and Zylem's proving programs</td><td>Its own software</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="limits">
+      <h3>What Zylem doesn't do yet</h3>
+      <ul>
+        <li><b>Re-check other people's transactions.</b> Like any light client, it relies on most hashpower enforcing the rules for transactions that never touch you.</li>
+        <li><b>Validate the transactions that touch you, guard supply and catch double spends.</b> Planned: local proof and signature checks for your own transactions, pool-balance tracking, and a proven nullifier set.</li>
+        <li><b>Watch the mempool.</b> Payments are verified once they are mined.</li>
+        <li><b>Protect a fresh install whose every source is eclipsed.</b> Minimum chain work and several sources narrow this; they cannot remove it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="layer">
+    <div class="head">
+      <p class="eyebrow">One verified history, many consumers</p>
+      <h2>Who serves the data no longer decides what you trust.</h2>
+      <p class="lede">Zylem separates data availability from verification. Anyone can build Rings and proofs, any host can serve them, and every consumer checks them itself. Wallets are the first consumer, not the last.</p>
+    </div>
+    <figure class="diagram">
+      <svg class="dg" viewBox="0 0 1000 310" role="img" aria-label="Zcash blocks are turned into Rings and a history proof by anyone, served by any untrusted host, and verified by each consumer: wallets today, services and watchers next, other chains as research">
+        <defs><marker id="la" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>
+        <text class="k" x="40" y="34">PRODUCE</text>
+        <text class="k" x="460" y="34">SERVE</text>
+        <text class="k" x="680" y="34">VERIFY AND USE</text>
+        <rect class="soft" x="40" y="110" width="160" height="100" rx="8"/>
+        <text class="t" x="56" y="138">Zcash</text>
+        <text class="s" x="56" y="160">blocks and headers</text>
+        <text class="s" x="56" y="178">from any node</text>
+        <path class="line" d="M200 160 H236" marker-end="url(#la)"/>
+        <rect class="box" x="240" y="110" width="180" height="100" rx="8"/>
+        <text class="t" x="256" y="138">Anyone builds</text>
+        <text class="s" x="256" y="160">Rings and the shared</text>
+        <text class="s" x="256" y="178">history proof</text>
+        <path class="line" d="M420 160 H456" marker-end="url(#la)"/>
+        <rect class="box" x="460" y="110" width="160" height="100" rx="8"/>
+        <text class="t" x="476" y="138">Any host</text>
+        <text class="s" x="476" y="160">CDN, mirror, IPFS</text>
+        <text class="s" x="476" y="178">not trusted</text>
+        <path class="line" d="M620 160 H646 V82 H676" marker-end="url(#la)"/>
+        <path class="line" d="M646 160 H676" marker-end="url(#la)"/>
+        <path class="line" d="M646 160 V238 H676" marker-end="url(#la)"/>
+        <rect class="hi" x="680" y="52" width="280" height="62" rx="8"/>
+        <text class="t" x="696" y="78">Wallets</text>
+        <text class="s" x="696" y="98">verified sync, no full node</text>
+        <rect class="pill-on" x="882" y="64" width="64" height="20" rx="10"/><text class="pt-on" x="914" y="78" text-anchor="middle">testnet</text>
+        <rect class="box" x="680" y="130" width="280" height="62" rx="8"/>
+        <text class="t" x="696" y="156">Services and watchers</text>
+        <text class="s" x="696" y="176">inclusion receipts, spend monitoring</text>
+        <rect class="pill-next" x="882" y="142" width="64" height="20" rx="10"/><text class="pt" x="914" y="156" text-anchor="middle">next</text>
+        <rect class="box" x="680" y="208" width="280" height="62" rx="8"/>
+        <text class="t" x="696" y="234">Other chains</text>
+        <text class="s" x="696" y="254">on-chain light client, inclusion</text>
+        <rect class="pill-on" x="882" y="220" width="64" height="20" rx="10"/><text class="pt-on" x="914" y="234" text-anchor="middle">local EVM</text>
+        <text class="s" x="40" y="292">A host can withhold or replay data, never alter it undetected. Switching hosts changes nothing about what a consumer trusts.</text>
+      </svg>
+    </figure>
+
+    <div class="pillars">
+      <div class="pillar">
+        <div class="pillar-top"><h3>Verify</h3><span class="chip on">Working on testnet</span></div>
+        <p>Authenticate Zcash data independently: every transaction ID, Merkle root and tree state in a block, checked against the headers and the proof of work.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-top"><h3>Access</h3><span class="chip next">Rings now, verified queries next</span></div>
+        <p>Fetch only the history you need, from any provider: Rings by height range today, then verified range queries and transaction-inclusion receipts.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-top"><h3>Connect</h3><span class="chip next">Tested locally</span></div>
+        <p>Bring verified Zcash facts into other applications and other chains, through a wrapped history proof and inclusion evidence. SP1's verifier contract already accepts Zylem's 356-byte proof in a local EVM for about 304,000 gas; nothing is deployed on a chain yet.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="head">
+      <p class="eyebrow">How it works</p>
+      <h2>Portable history, one shared proof, checked on your side.</h2>
+    </div>
+    <figure class="diagram flow">
+      <svg class="dg" viewBox="0 0 1000 250" role="img" aria-label="Four steps: Rings carry portable history, SP1 proves the header rules, aggregation joins proofs into one, and the client verifies the proof and each Ring locally">
+        <defs><marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>
+        <circle class="soft" cx="130" cy="96" r="58"/>
+        <circle class="dash" cx="130" cy="96" r="40"/>
+        <circle class="acc" cx="130" cy="96" r="32"/>
+        <circle class="ring" cx="130" cy="96" r="22"/>
+        <circle class="ring" cx="130" cy="96" r="12"/>
+        <circle class="hot" cx="130" cy="96" r="4"/>
+        <path class="line" d="M192 96 H302" marker-end="url(#fa)"/>
+        <circle class="soft" cx="370" cy="96" r="58"/>
+        <rect class="box" x="344" y="70" width="52" height="52" rx="6"/>
+        <path class="line" d="M354 62v8M370 62v8M386 62v8M354 122v8M370 122v8M386 122v8M336 80h8M336 96h8M336 112h8M396 80h8M396 96h8M396 112h8"/>
+        <text class="t" x="370" y="101" text-anchor="middle">SP1</text>
+        <path class="line" d="M432 96 H542" marker-end="url(#fa)"/>
+        <circle class="soft" cx="610" cy="96" r="58"/>
+        <path class="line" d="M586 122 L598 104 L610 122 M622 122 L634 104 L646 122 M598 104 L622 80 L634 104"/>
+        <circle class="dot" cx="586" cy="122" r="5"/><circle class="dot" cx="610" cy="122" r="5"/><circle class="dot" cx="622" cy="122" r="5"/><circle class="dot" cx="646" cy="122" r="5"/>
+        <circle class="dot" cx="598" cy="104" r="5"/><circle class="dot" cx="634" cy="104" r="5"/>
+        <circle class="hot" cx="622" cy="78" r="7"/>
+        <path class="line" d="M672 96 H782" marker-end="url(#fa)"/>
+        <circle class="hi" cx="850" cy="96" r="58"/>
+        <rect class="phone" x="831" y="62" width="38" height="68" rx="7"/>
+        <rect class="screen" x="837" y="71" width="26" height="46" rx="3"/>
+        <path class="check" d="M843 95 l5 5 l9 -10"/>
+        <text class="t" x="130" y="186" text-anchor="middle">1 · Rings</text>
+        <text class="s" x="130" y="206" text-anchor="middle">portable Zcash history</text>
+        <text class="s" x="130" y="222" text-anchor="middle">that anyone can host</text>
+        <text class="t" x="370" y="186" text-anchor="middle">2 · Prove</text>
+        <text class="s" x="370" y="206" text-anchor="middle">SP1 checks Equihash and</text>
+        <text class="s" x="370" y="222" text-anchor="middle">every header rule</text>
+        <text class="t" x="610" y="186" text-anchor="middle">3 · Aggregate</text>
+        <text class="s" x="610" y="206" text-anchor="middle">many leaf proofs become</text>
+        <text class="s" x="610" y="222" text-anchor="middle">one history proof</text>
+        <text class="t" x="850" y="186" text-anchor="middle">4 · Verify</text>
+        <text class="s" x="850" y="206" text-anchor="middle">the client checks the proof</text>
+        <text class="s" x="850" y="222" text-anchor="middle">and each Ring locally</text>
+      </svg>
+      <figcaption>Rings, native verification and GPU proving all run on testnet today. The <a href="/demo/">live demo</a> checks real Rings and real proofs in your browser.</figcaption>
+    </figure>
+    <p class="more"><a class="btn ghost" href="/how/">How Zylem works, in detail</a></p>
+  </section>
+
+  <section id="modes">
+    <div class="head">
+      <p class="eyebrow">Two ways to verify</p>
+      <h2>Rings work on their own. Proofs make them light.</h2>
+      <p class="lede">Every Ring can be checked without a proof. A shared history proof replaces the heavy part, the headers, for clients that cannot afford it.</p>
+    </div>
+    <div class="modes">
+      <div class="mode">
+        <div class="mode-top"><h3>Full Rings</h3><span class="chip on">Working on testnet</span></div>
+        <p>Each Ring carries its blocks' headers, so the client checks every header's Equihash, difficulty and link itself, from a checkpoint. No proof system to trust.</p>
+        <ul>
+          <li>Best for desktops, servers and the proxy</li>
+          <li>About 1.5 KB of header per block to download and check</li>
+          <li>History checked in order from the checkpoint</li>
+        </ul>
+      </div>
+      <div class="mode light">
+        <div class="mode-top"><h3>Light Rings + history proof</h3><span class="chip next">Next on testnet</span></div>
+        <p>Rings carry 104-byte block records instead of headers, and one SP1 proof shows every header followed Zcash's rules, Equihash included.</p>
+        <ul>
+          <li>One proof of about 0.8 MB instead of about 2.7 GB of headers for mainnet since NU5</li>
+          <li>One check in about 40 ms instead of 1.84 million Equihash checks</li>
+          <li>Jump straight to any Ring; the proof can start at genesis at no cost to clients</li>
+          <li>Small enough for phones, browsers and, wrapped, other chains</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+
+
+  <section id="uses">
+    <div class="head">
+      <p class="eyebrow">Where it applies</p>
+      <h2>Wallets first, then anything that reads Zcash.</h2>
+    </div>
+    <div class="scroll">
+      <table class="tbl cards">
+        <thead><tr><th scope="col">Who</th><th scope="col">What Zylem gives them</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+          <tr><td>Wallets</td><td>Verified sync without a full node or a trusted server</td><td><span class="chip on">Testnet</span></td></tr>
+          <tr><td>Light-server operators</td><td>Serve history as Ring files from a CDN, backed by a pruned node</td><td><span class="chip on">Testnet</span></td></tr>
+          <tr><td>Channel and DLC watchers</td><td>Complete, verified spend monitoring: a server cannot hide a close or a spend</td><td><span class="chip next">Next</span></td></tr>
+          <tr><td>Payment processors and agents</td><td>Verified payment and confirmation evidence, as inclusion receipts</td><td><span class="chip next">Next</span></td></tr>
+          <tr><td>Explorers and analytics</td><td>Historical queries whose answers can be checked</td><td><span class="chip later">Planned</span></td></tr>
+          <tr><td>Bridges and contracts on other chains</td><td>Proof-backed Zcash facts under stated assumptions: a proven block hash today, inclusion facts next</td><td><span class="chip next">Tested locally</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="numbers">
+    <div class="head">
+      <p class="eyebrow">Benchmarks</p>
+      <h2>Measured, not promised.</h2>
+      <p class="lede">Each figure comes from a recorded run. The <a href="/how/#sources">measurements list</a> names the file behind each one.</p>
+    </div>
+    <div class="bench">
+      <div><span class="col-k">Native Ring verification</span><b class="mono">9 s</b><span>for 29,571 testnet blocks, every check, M2 Pro</span><a href="/how/#sources">Source</a></div>
+      <div><span class="col-k">History check</span><b class="mono">37.6 ms</b><span>one proof in WebAssembly, instead of 1.84 million Equihash checks for mainnet since NU5</span><a href="/how/#sources">Source</a></div>
+      <div><span class="col-k">History download</span><b class="mono">0.8 MB</b><span>compressed proof, instead of about 2.7 GB of headers for mainnet since NU5</span><a href="/how/#sources">Source</a></div>
+      <div><span class="col-k">Proving all of NU5 onward</span><b class="mono">~$323</b><span>once, projected from 1.88 headers/s with full Equihash on one RTX 5090</span><a href="/how/#sources">Source</a></div>
+    </div>
+  </section>
+
+  <section id="try">
+    <div class="head">
+      <p class="eyebrow">Developer quickstart</p>
+      <h2>Try verified Zcash sync without rewriting your wallet.</h2>
+      <p class="lede">Point an existing light wallet at the Zylem proxy instead of its usual server. It speaks the same protocol, so the wallet only needs a new server address.</p>
+    </div>
+    <div class="cmds">
+      <div class="cmd">
+        <header><span><b>1</b> Run the proxy with the shipped checkpoint</span><button class="copy" type="button" data-copy="c2">Copy</button></header>
+        <pre id="c2">./target/release/zylem-proxy --rings http://127.0.0.1:8090 \
+    --headers-rpc http://user:pass@127.0.0.1:18232/ \
+    --upstream https://testnet.zec.rocks:443 \
+    --checkpoint "$(jq -r .checkpoint checkpoints/testnet.json)"</pre>
+      </div>
+      <div class="cmd">
+        <header><span><b>2</b> Sync an existing wallet through it</span><button class="copy" type="button" data-copy="c3">Copy</button></header>
+        <pre id="c3">zcash-devtool wallet -w my-wallet sync --server 127.0.0.1:9067</pre>
+      </div>
+      <div class="cmd out">
+        <header><span><b>3</b> What a rejection looks like</span><span class="tag-ex">example output</span></header>
+        <pre>WARN zylem: REJECT Ring 4518274..=4522369 rejected: transaction 4 at height 4521980: rebuilt ID does not match
+WARN zylem_proxy: serving only the verified range up to 4518273</pre>
+      </div>
+    </div>
+    <p class="note" style="margin-top:18px">Testnet only, from the Zylem repository. The proxy reads Rings from a host such as <span class="mono">zylem-build serve --out data/testnet --rpc http://127.0.0.1:18232/</span>, and <span class="mono">zylem-build probe --lwd http://127.0.0.1:9067</span> shows whether it accepts its current tip.</p>
+    <p class="more"><a class="btn ghost" href="/how/#build">Build Rings, prove them and verify them yourself</a></p>
+  </section>
+
+  <section id="status">
+    <div class="head">
+      <p class="eyebrow">Status · October 2026</p>
+      <h2>Working on testnet. Mainnet is next.</h2>
+    </div>
+    <ul class="status">
+      <li><span class="pill done">Done</span><div>Verifying transactions, tree states and headers from Rings<small>An unmodified zcash-devtool wallet syncs through the proxy; the attacks above are rejected.</small></div></li>
+      <li><span class="pill done">Done</span><div>The full header rules, matched against Zakura<small>1.55M testnet headers from NU6 across NU7, 400,000 random cases, 46,542 transaction IDs.</small></div></li>
+      <li><span class="pill done">Done</span><div>Tip policy<small>Minimum chain work, several sources, a two-hour future limit and a stale-tip alarm.</small></div></li>
+      <li><span class="pill done">Done</span><div>Header proofs on testnet<small>17,920 headers proved with Equihash on an RTX 5090, from NU7 activation and a recent range. Proving the rest of the NU7 range is next.</small></div></li>
+      <li><span class="pill done">Done</span><div>Verification in the browser<small>The full Ring check and the proof verifier in WebAssembly: 4,096 blocks in about 2.5 s, a history proof in about 50 ms. <a href="/demo/">Try it</a>.</small></div></li>
+      <li><span class="pill next">Next</span><div>Verified range queries and inclusion receipts<small>Reusable primitives for wallets, payment processors, agents and watchers.</small></div></li>
+      <li><span class="pill later">Planned</span><div>Mainnet from NU5<small>Rings and proofs for every block since NU5, kept current as new blocks arrive.</small></div></li>
+      <li><span class="pill later">Planned</span><div>Verification inside wallets<small>A verifying block source for wallet SDKs, and private queries over OHTTP.</small></div></li>
+      <li><span class="pill done">Tested</span><div>Zcash facts on other chains<small>SP1's verifier contract accepts Zylem's 356-byte history proof in a local EVM for about 304,000 gas, and an example contract stores the proven Zcash block hash. Nothing is deployed on a chain yet; a freshness rule and transaction inclusion paths come next.</small></div></li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Zylem · verification for Zcash light wallets · <a href="/how/">How Zylem works</a> · <a href="/how/#details">Technical details</a> · <a href="#status">Status</a> · <a href="/demo/">Live demo</a></span>
+    <span class="mono">testnet · October 2026</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  // Attack demo
+  const attacks = {
+    fake: { server: 'Adds a note paying you to the compact data of a real block.', today: 'Shows funds that were never sent.', verdict: 'Rejected', zylem: "The altered transaction's rebuilt ID no longer matches what the block header committed to.", error: 'REJECT Ring 4518274..=4522369 rejected: transaction 4 at height 4521980: rebuilt ID does not match' },
+    hidden: { server: 'Drops a transaction that pays you from a block it serves.', today: 'Never sees the payment.', verdict: 'Rejected', zylem: "The remaining transaction IDs no longer produce the block's Merkle root.", error: 'REJECT Ring 4518274..=4522369 rejected: Merkle root mismatch at height 4521980' },
+    tree: { server: "Hands out a note commitment tree state that doesn't match the chain.", today: 'Builds spends on it that the network refuses.', verdict: 'Rejected', zylem: "The tree roots don't match the history tree committed in the next header.", error: 'REJECT Ring 4518274..=4522369 rejected: Ironwood note commitment tree root mismatch at height 4521980' },
+    stale: { server: 'Serves a chain that stops early or carries too little work.', today: 'Follows it and misses newer payments.', verdict: 'Refused', zylem: 'The tip needs the shipped minimum chain work and confirmation from at least two independent sources, so the wallet gets an error instead of the weak chain.', error: 'zylem: TIP POLICY FAILED: node http://127.0.0.1:18292/ has 2000 verified blocks after the served tip', caution: 'Several sources reduce this risk but cannot guarantee freshness: if every source is eclipsed together, a valid but outdated chain can still pass.' }
+  };
+  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+  const panel = document.getElementById('demo-panel');
+  const set = (id, text) => { document.getElementById(id).textContent = text; };
+  function show(tab, focus) {
+    const a = attacks[tab.dataset.attack];
+    tabs.forEach(t => { const on = t === tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+    panel.setAttribute('aria-labelledby', tab.id);
+    set('d-server', a.server); set('d-today', a.today); set('d-verdict', a.verdict); set('d-zylem', a.zylem); set('d-error', a.error);
+    const c = document.getElementById('d-caution');
+    c.hidden = !a.caution; c.textContent = a.caution || '';
+    if (focus) tab.focus();
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => show(t));
+    t.addEventListener('keydown', e => {
+      const k = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (k) { e.preventDefault(); show(tabs[(i + k + tabs.length) % tabs.length], true); }
+    });
+  });
+
+  // Copy buttons
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pre = document.getElementById(btn.dataset.copy);
+      const text = pre.textContent;
+      const done = msg => { btn.textContent = msg; setTimeout(() => { btn.textContent = 'Copy'; }, 1600); };
+      const select = () => { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Selected'); };
+      try {
+        navigator.clipboard.writeText(text).then(() => done('Copied'), select);
+      } catch (e) { select(); }
+    });
+  });
+
+  // Tree-ring cross-section: eight sealed testnet Rings plus the open tail.
+  const canvas = document.getElementById('rings');
+  const ctx = canvas.getContext('2d');
+  const starts = ['4,493,698', '4,497,794', '4,501,890', '4,505,986', '4,510,082', '4,514,178', '4,518,274', '4,522,370', '4,526,466', '4,530,562'];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  let phase = 0, raf = 0;
+
+  // Deterministic wobble, so the rings look grown but draw the same every time.
+  const wobble = (i, a) => 0.018 * Math.sin(3 * a + i * 1.7) + 0.012 * Math.sin(5 * a + i * 0.9) + 0.008 * Math.sin(9 * a + i * 2.3);
+
+  function colors() {
+    const s = getComputedStyle(document.documentElement);
+    const v = n => s.getPropertyValue(n).trim();
+    return { ring: v('--ring'), accent: v('--accent'), ink: v('--ink'), muted: v('--muted'), tint: v('--accent-tint'), paper: v('--paper') };
+  }
+
+  function ringPath(cx, cy, r, i) {
+    ctx.beginPath();
+    for (let k = 0; k <= 180; k++) {
+      const a = (k / 180) * Math.PI * 2;
+      const rr = r * (1 + wobble(i, a));
+      const x = cx + rr * Math.cos(a), y = cy + rr * Math.sin(a);
+      k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  function draw() {
+    const box = canvas.getBoundingClientRect();
+    const size = Math.max(200, Math.round(box.width));
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (canvas.width !== size * dpr) { canvas.width = size * dpr; canvas.height = size * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    const c = colors();
+    const cx = size * 0.36, cy = size * 0.5;
+    const r0 = size * 0.05, step = size * 0.256 / starts.length;
+
+    // Pith
+    ctx.fillStyle = c.accent;
+    ctx.beginPath(); ctx.arc(cx, cy, r0 * 0.55, 0, Math.PI * 2); ctx.fill();
+
+    // Heartwood tint behind the sealed rings
+    ringPath(cx, cy, r0 + step * starts.length, 3);
+    ctx.fillStyle = c.tint; ctx.globalAlpha = 0.55; ctx.fill(); ctx.globalAlpha = 1;
+
+    // Sealed Rings
+    for (let i = 0; i < starts.length; i++) {
+      const r = r0 + step * (i + 1);
+      ringPath(cx, cy, r, i);
+      ctx.strokeStyle = i === starts.length - 1 ? c.accent : c.ring;
+      ctx.lineWidth = i === starts.length - 1 ? 2 : 1.25;
+      ctx.stroke();
+    }
+
+    // Rays
+    ctx.strokeStyle = c.ring; ctx.lineWidth = 0.75; ctx.globalAlpha = 0.45;
+    for (let k = 0; k < 7; k++) {
+      const a = k * 0.9 + 0.3, rIn = r0 * 0.8, rOut = r0 + step * starts.length;
+      ctx.beginPath(); ctx.moveTo(cx + rIn * Math.cos(a), cy + rIn * Math.sin(a)); ctx.lineTo(cx + rOut * Math.cos(a), cy + rOut * Math.sin(a)); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Open tail: dashed, its dashes drifting outward slowly
+    const rt = r0 + step * (starts.length + 1.15);
+    ringPath(cx, cy, rt, 11);
+    ctx.setLineDash([5, 7]); ctx.lineDashOffset = -phase;
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Labels: innermost, newest sealed, and the tail
+    const fs = Math.max(10.5, size * 0.024);
+    ctx.font = `500 ${fs}px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.textBaseline = 'middle';
+    const label = (r, a, text, sub, strong) => {
+      const x0 = cx + r * Math.cos(a), y0 = cy + r * Math.sin(a);
+      const x1 = cx + (rt + size * 0.05) * Math.cos(a);
+      const y1 = cy + (rt + size * 0.05) * Math.sin(a);
+      const tx = Math.max(size * 0.76, x1 + 12);
+      ctx.strokeStyle = c.muted; ctx.lineWidth = 0.75;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(tx - 6, y1); ctx.stroke();
+      ctx.fillStyle = c.muted; ctx.beginPath(); ctx.arc(x0, y0, 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.font = `500 ${fs}px "IBM Plex Mono", ui-monospace, monospace`;
+      ctx.fillStyle = strong ? c.ink : c.muted;
+      ctx.fillText(text, tx, y1 - fs * 0.62);
+      ctx.font = `400 ${fs * 0.86}px "IBM Plex Sans", Arial, sans-serif`;
+      ctx.fillStyle = c.muted;
+      ctx.fillText(sub, tx, y1 + fs * 0.66);
+    };
+    label(r0 + step, -0.62, starts[0], 'first Ring', false);
+    label(r0 + step * starts.length, -0.05, starts[starts.length - 1], 'newest sealed', true);
+    label(rt, 0.55, '4,534,658', 'open tail', true);
+  }
+
+  function tick() {
+    phase = (phase + 0.12) % 1200;
+    draw();
+    raf = requestAnimationFrame(tick);
+  }
+  function start() {
+    cancelAnimationFrame(raf);
+    draw();
+    if (!reduce.matches) raf = requestAnimationFrame(tick);
+  }
+
+  start();
+  addEventListener('resize', draw);
+  reduce.addEventListener?.('change', start);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  document.fonts?.ready.then(draw);
+
+  // Tables carry their column names so phones can show one card per row.
+  document.querySelectorAll('table.tbl.cards').forEach(t => {
+    const names = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim());
+    for (const tr of t.tBodies[0].rows) [...tr.cells].forEach((c, i) => { if (names[i]) c.dataset.label = names[i]; });
+  });
+  // Close the phone menu after a jump.
+  document.querySelectorAll('details.menu a').forEach(a => a.addEventListener('click', () => a.closest('details').open = false));
+})();
+</script>

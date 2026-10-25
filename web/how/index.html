@@ -1,0 +1,770 @@
+<title>How Zylem Works</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a left-set editorial column; the hero pairs the thesis with a tree-ring cross-section whose rings are real testnet Rings. */
+:root {
+  --paper: #f1f4ef;
+  --paper-2: #e7ece5;
+  --ink: #142019;
+  --muted: #56645b;
+  --rule: #d3dbd2;
+  --ring: #8b9b90;
+  --accent: #1d6b47;
+  --accent-tint: #d4ebdc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --measure: 62ch;
+  --wide: 1120px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b;
+    --ring: #4f6458; --accent: #6fd2a0; --accent-tint: #173627; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1411; --paper-2: #131d18; --ink: #e5eee8; --muted: #9caba2; --rule: #24322b;
+  --ring: #4f6458; --accent: #6fd2a0; --accent-tint: #173627; color-scheme: dark;
+}
+
+body { background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--body); }
+.wrap {
+  max-width: var(--wide); margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h2 { font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 800; line-height: 1.08; letter-spacing: -0.01em; }
+h3 { font-size: 1.15rem; font-weight: 600; line-height: 1.3; }
+p { margin: 0; }
+.eyebrow { font: 500 0.78rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { max-width: var(--measure); color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Top bar */
+.top { padding-block: 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.mark { display: flex; align-items: center; gap: 10px; font: 800 1.25rem/1 var(--display); color: var(--ink); text-decoration: none; }
+.mark svg { width: 26px; height: 26px; }
+.top nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.95rem; }
+.top nav a { color: var(--muted); text-decoration: none; }
+.top nav a:hover { color: var(--ink); }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 40px; align-items: center; padding-block: 40px 56px; }
+.hero h1 { font-size: clamp(2.5rem, 6vw, 4.6rem); font-weight: 800; line-height: 0.98; letter-spacing: -0.025em; margin-block: 16px 22px; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero .lede { font-size: 1.1rem; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 999px; font: 600 0.95rem/1 var(--body); text-decoration: none; border: 1.5px solid var(--accent); }
+.btn.solid { background: var(--accent); color: var(--paper); }
+.btn.ghost { color: var(--accent); }
+.figure { min-width: 0; }
+.figure canvas { width: 100%; max-width: 100%; aspect-ratio: 1 / 1; display: block; }
+.figure figcaption { font-size: 0.85rem; color: var(--muted); max-width: 46ch; margin-top: 8px; }
+
+/* Facts strip */
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.fact { padding: 22px 20px 22px 0; display: grid; gap: 4px; min-width: 0; }
+.fact + .fact { padding-left: 20px; border-left: 1px solid var(--rule); }
+.fact b { font: 800 clamp(1.6rem, 3vw, 2.2rem)/1 var(--display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 0.92rem; color: var(--muted); }
+
+section { padding-block: 72px; }
+section + section { border-top: 1px solid var(--rule); }
+.head { display: grid; gap: 14px; margin-bottom: 36px; }
+
+/* Attacks table */
+.attacks { width: 100%; border-collapse: collapse; font-size: 0.98rem; }
+.attacks th { text-align: left; font: 500 0.75rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0 16px 12px 0; border-bottom: 1px solid var(--rule); }
+.attacks td { padding: 18px 16px 18px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.attacks td:first-child { font-weight: 600; width: 28%; }
+.attacks td:nth-child(2) { color: var(--muted); width: 30%; }
+.verdict { display: inline-block; font: 500 0.72rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); background: var(--accent-tint); padding: 5px 8px; border-radius: 4px; margin-bottom: 6px; }
+.scroll { overflow-x: auto; }
+
+/* Chain of checks */
+.chain { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; position: relative; }
+.link { padding: 22px 22px 22px 0; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.link + .link { padding-left: 22px; border-left: 1px solid var(--rule); }
+.link .tag { font: 500 0.75rem/1.2 var(--mono); color: var(--accent); letter-spacing: 0.04em; }
+.link p { color: var(--muted); font-size: 0.95rem; }
+.arrowline { grid-column: 1 / -1; height: 1px; background: var(--rule); position: relative; margin-bottom: 6px; }
+.chain-note { margin-top: 26px; max-width: var(--measure); color: var(--muted); }
+
+/* Two-up blocks */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.stack { display: grid; gap: 16px; }
+.numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.numbers div { background: var(--paper); padding: 18px; display: grid; gap: 4px; min-width: 0; }
+.numbers b { font: 800 1.6rem/1.05 var(--display); font-variant-numeric: tabular-nums; }
+.numbers span { font-size: 0.88rem; color: var(--muted); }
+
+/* How it's made: three processes, each a row of steps that stacks on phones */
+.procs { display: grid; gap: 56px; }
+.proc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 18px; }
+.proc-head h3 { font-size: 1.4rem; font-weight: 800; }
+.proc-head p { color: var(--muted); flex: 1 1 320px; min-width: 0; }
+.cadence { font: 500 0.75rem/1.3 var(--mono); color: var(--accent); background: var(--accent-tint); padding: 5px 8px; border-radius: 4px; white-space: nowrap; }
+.diagram { margin: 0; overflow-x: auto; }
+.diagram svg { width: 100%; min-width: 860px; height: auto; display: block; }
+.diagram figcaption { margin-top: 10px; font-size: 0.88rem; color: var(--muted); max-width: var(--measure); position: sticky; left: 0; }
+.dg .t { font: 600 14px var(--display); fill: var(--ink); }
+.dg .t2 { font: 600 12.5px var(--display); fill: var(--ink); }
+.dg .s { font: 400 12px var(--body); fill: var(--muted); }
+.dg .m { font: 500 11.5px var(--mono); fill: var(--ink); }
+.dg .k { font: 500 11px var(--mono); fill: var(--accent); letter-spacing: 0.06em; }
+.dg .line { fill: none; stroke: var(--ring); stroke-width: 1.5; }
+.dg .thin { fill: none; stroke: var(--rule); stroke-width: 1.25; }
+.dg .box { fill: var(--paper); stroke: var(--ring); stroke-width: 1.25; }
+.dg .soft { fill: var(--paper-2); stroke: var(--rule); stroke-width: 1; }
+.dg .hi { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 2; }
+.dg .acc { fill: none; stroke: var(--accent); stroke-width: 2; }
+.dg .dash { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 5; }
+.dg .ah { fill: var(--ring); }
+.dg .ah2 { fill: var(--accent); }
+.dg .hot { fill: var(--accent); }
+.dg .tick { fill: var(--ring); opacity: 0.55; }
+.dg .tick2 { fill: var(--accent); opacity: 0.7; }
+.dg .phone { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 2; }
+.dg .screen { fill: var(--paper); }
+.dg .check { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.proc-note { margin-top: 14px; font-size: 0.9rem; color: var(--muted); max-width: var(--measure); }
+.values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 32px; margin-top: 48px; }
+.value { display: grid; gap: 6px; align-content: start; min-width: 0; padding-top: 14px; border-top: 2px solid var(--accent); }
+.value p { color: var(--muted); font-size: 0.95rem; }
+
+/* Trust */
+.trust { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; }
+.trust ul { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+.trust li { padding-left: 22px; position: relative; }
+.trust li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ring); }
+.trust .yes li::before { background: var(--accent); border-color: var(--accent); }
+.trust .caveat { margin-top: 28px; grid-column: 1 / -1; color: var(--muted); max-width: var(--measure); font-size: 0.95rem; }
+
+/* Status */
+.status { list-style: none; margin: 0; padding: 0; display: grid; }
+.status li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+.pill { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; justify-self: start; }
+.pill.done { color: var(--accent); background: var(--accent-tint); }
+.pill.next { color: var(--paper); background: var(--accent); }
+.pill.later { color: var(--muted); border: 1px solid var(--rule); }
+.status small { display: block; color: var(--muted); font-size: 0.9rem; }
+
+/* Try it */
+.cmds { display: grid; gap: 14px; }
+.cmd { border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-2); overflow: hidden; }
+.cmd header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
+.cmd pre { margin: 0; padding: 14px; overflow-x: auto; font: 400 0.86rem/1.6 var(--mono); color: var(--ink); }
+.copy { font: 500 0.8rem/1 var(--body); color: var(--accent); background: none; border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.copy:hover { border-color: var(--accent); }
+.note { font-size: 0.92rem; color: var(--muted); max-width: var(--measure); }
+
+footer { border-top: 1px solid var(--rule); padding-block: 28px 40px; color: var(--muted); font-size: 0.88rem; display: flex; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .hero, .split, .trust { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding-block: 16px 40px; gap: 24px; }
+  .figure { max-width: 460px; }
+  .chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .link:nth-child(3) { padding-left: 0; border-left: 0; }
+  .link:nth-child(n+3) { border-top: 1px solid var(--rule); }
+}
+@media (max-width: 860px) {
+  .values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .values { grid-template-columns: minmax(0, 1fr); }
+  body { font-size: 16px; }
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .fact, .fact + .fact { padding: 16px 0; border-left: 0; }
+  .fact + .fact { border-top: 1px solid var(--rule); }
+  .chain { grid-template-columns: minmax(0, 1fr); }
+  .link, .link + .link { padding: 18px 0; border-left: 0; }
+  .link + .link { border-top: 1px solid var(--rule); }
+  .numbers { grid-template-columns: minmax(0, 1fr); }
+  .status li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  section { padding-block: 52px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+
+/* How page */
+.intro { padding-block: 40px 24px; display: grid; gap: 16px; }
+.intro h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; line-height: 1.02; letter-spacing: -0.02em; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; font-size: 0.95rem; }
+.toc a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--rule); }
+.toc a:hover { color: var(--ink); }
+.facts-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.facts-list li { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.facts-list b { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.facts-list span { color: var(--muted); }
+@media (max-width: 560px) { .facts-list li { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
+/* Visual-system refinements: bright green only for actions, verified states and selection;
+   three text levels; quieter borders; one radius scale (8 controls, 12 cards, pills only
+   for buttons and selectors). */
+:root { --text-3: #66746b; --accent-muted: #3d7a5c; --rule-soft: #e2e8e0; --r-control: 8px; --r-card: 12px; --r-pill: 999px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --text-3: #728078; --accent-muted: #4f9673; --rule-soft: #1c2a23; --rule: #26372e; --paper-2: #121c17; }
+}
+:root[data-theme="dark"] { --text-3: #728078; --accent-muted: #4f9673; --rule-soft: #1c2a23; --rule: #26372e; --paper-2: #121c17; }
+a { color: var(--accent-muted); }
+a:hover { color: var(--accent); }
+.btn.solid, .btn.solid:hover { color: var(--paper); }
+.btn.ghost:hover { color: var(--accent); background: var(--accent-tint); }
+.eyebrow, .col-k, .tbl thead th, .attacks thead th { font-size: 0.8rem; line-height: 1.4; color: var(--text-3); }
+.figure figcaption, .diagram figcaption, .note, .tag-ex, .status small, .proc-note, .facts-list span { color: var(--text-3); }
+.badges span { border-radius: 4px; font-size: 0.72rem; padding: 4px 8px; border-color: var(--rule-soft); color: var(--text-3); }
+.cmd { border-radius: var(--r-control); border-color: var(--rule-soft); }
+.cmd header { border-bottom-color: var(--rule-soft); }
+.copy { border-radius: var(--r-control); border-color: var(--rule-soft); }
+details, .numbers, .mode, .panel, .bench { border-radius: var(--r-card); }
+details, .mode:not(.light), .panel { border-color: var(--rule-soft); }
+.mode.light { border-color: var(--accent-muted); }
+.numbers, .bench { background: var(--rule-soft); border-color: var(--rule-soft); }
+section + section, footer { border-top-color: var(--rule-soft); }
+.tbl th, .tbl td, .attacks td, .status li, .facts-list li { border-bottom-color: var(--rule-soft); }
+.panel .col + .col, .fact + .fact, .link + .link { border-color: var(--rule-soft); }
+.spectrum td:nth-child(3), .spectrum td:nth-child(4) { background: color-mix(in srgb, var(--accent-tint) 40%, transparent); }
+.spectrum thead th:nth-child(3), .spectrum thead th:nth-child(4) { color: var(--accent); }
+.points li::before { border-color: var(--accent-muted); }
+.value, .pillar { border-top-color: var(--accent-muted); }
+.tabs button { border-color: var(--rule); }
+.tabs button:hover { border-color: var(--accent-muted); background: var(--paper-2); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tbl td, .bench b, .numbers b, .fact b, .facts-list b, .status { font-variant-numeric: tabular-nums; }
+
+/* Navigation: five links on wide screens, one compact menu on phones. */
+.top { position: relative; }
+.top nav.primary { align-items: center; }
+.nav-cta { color: var(--accent) !important; font-weight: 600; border: 1.5px solid var(--accent-muted); border-radius: var(--r-pill); padding: 5px 12px; }
+.nav-cta:hover { background: var(--accent-tint); }
+details.menu { display: none; border: 0; padding: 0; background: none; }
+details.menu > summary { list-style: none; font: 600 0.95rem/1 var(--body); padding: 9px 14px; border: 1.5px solid var(--rule); border-radius: var(--r-pill); color: var(--ink); }
+details.menu > summary::-webkit-details-marker { display: none; }
+details.menu[open] > div { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: 64px; z-index: 20; display: grid; gap: 2px; min-width: 220px; padding: 8px; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--r-card); box-shadow: 0 12px 32px rgb(0 0 0 / 0.18); }
+details.menu[open] > div a { padding: 10px 12px; border-radius: var(--r-control); color: var(--ink); text-decoration: none; }
+details.menu[open] > div a:hover { background: var(--paper-2); }
+@media (max-width: 760px) {
+  .top nav.primary a:not(.nav-cta) { display: none; }
+  .top nav.primary { margin-left: auto; }
+  details.menu { display: block; }
+  .top { flex-wrap: nowrap; }
+}
+/* Tables become one card per row on phones; commands wrap inside their own box. */
+.cmds > * { min-width: 0; }
+@media (max-width: 640px) {
+  .scroll .tbl.cards { min-width: 0; }
+  .tbl.cards, .tbl.cards tbody, .tbl.cards tr, .tbl.cards th, .tbl.cards td { display: block; width: auto !important; }
+  .tbl.cards thead { display: none; }
+  .tbl.cards tr { padding: 14px 0; border-bottom: 1px solid var(--rule-soft); }
+  .tbl.cards th, .tbl.cards td { border: 0; padding: 3px 0 !important; background: none !important; }
+  .tbl.cards tr > :first-child { font-weight: 600; color: var(--ink); padding-bottom: 6px !important; }
+  .tbl.cards td[data-label]:not(:first-child)::before { content: attr(data-label); display: block; font: 500 0.74rem/1.4 var(--mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); }
+  .spectrum td:nth-child(3) { color: var(--ink); }
+  .spectrum td:nth-child(3)::before { color: var(--accent) !important; }
+  .cmd pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+}
+/* On phones the hero figure shrinks so the first action stays prominent. */
+@media (max-width: 860px) {
+  .hero .figure { max-width: 240px; margin-inline: auto; }
+  .hero .figure figcaption { display: none; }
+}
+details { border: 1px solid var(--rule-soft); border-radius: var(--r-card); padding: 0 18px; background: var(--paper); }
+details[open] { padding-bottom: 22px; }
+details > summary { cursor: pointer; padding: 16px 0; font: 600 1.05rem/1.3 var(--display); }
+details.menu, details.menu[open] { border: 0; padding: 0; background: none; }
+.details { display: grid; gap: 10px; }
+.detail-p { color: var(--muted); max-width: var(--measure); }
+
+/* Each process block scrolls its own wide diagram instead of widening the page. */
+.procs > *, .proc, .proc-head { min-width: 0; }
+.proc-head .cadence { white-space: normal; }
+/* Build guide */
+.guide { display: grid; gap: 44px; }
+.guide-step { display: grid; gap: 14px; min-width: 0; }
+.guide-step h3 { font-size: 1.3rem; font-weight: 800; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="/" aria-label="Zylem home">
+      <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="13" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="13" r="3.5" fill="currentColor"/></svg>
+      Zylem
+    </a>
+    <nav class="primary" aria-label="Sections">
+      <a href="#rings">Rings</a>
+      <a href="#proofs">Proofs</a>
+      <a href="#verify">Verification</a>
+      <a href="#build">Build it</a>
+      <a class="nav-cta" href="/demo/">Live demo</a>
+    </nav>
+    <details class="menu">
+      <summary aria-label="All sections">Menu</summary>
+      <div>
+        <a href="/">Home</a>
+        <a href="#chain">Checks</a>
+        <a href="#rings">Rings</a>
+        <a href="#proofs">Proofs</a>
+        <a href="#verify">Verification</a>
+        <a href="#trust">Trust</a>
+        <a href="#build">Build it yourself</a>
+        <a href="#details">Technical details</a>
+        <a href="#sources">Measurements</a>
+        <a href="/demo/">Live demo</a>
+      </div>
+    </details>
+  </header>
+
+  <div class="intro">
+    <p class="eyebrow">How Zylem works</p>
+    <h1>From the block header down to every note a wallet scans.</h1>
+    <p class="lede">Zylem has three parts. Ring files carry Zcash history, a shared header proof stands in for every historical header, and the client checks both before its wallet scans anything. This page explains each part and what the client has to trust.</p>
+  </div>
+
+  <section id="chain">
+    <div class="head">
+      <p class="eyebrow">The chain of checks</p>
+      <h2>Every check hangs from the block header.</h2>
+      <p class="lede">Zcash headers anchor the commitments Zylem uses to authenticate wallet data. Zylem walks from the header down to the notes, so nothing a wallet uses is taken on the server's word.</p>
+    </div>
+    <div class="chain">
+      <div class="link"><span class="tag">Header</span><h3>Proof of work and difficulty</h3><p>Equihash, the target, the per-block difficulty adjustment and the time rules, checked from a trusted checkpoint.</p></div>
+      <div class="link"><span class="tag">Transactions · ZIP 244</span><h3>Transaction IDs rebuilt</h3><p>Each ID is rebuilt from the compact data the wallet already gets, plus a few hundred bytes of digests, then matched to the header's Merkle root.</p></div>
+      <div class="link"><span class="tag">History · ZIP 221</span><h3>Tree roots authenticated</h3><p>The history tree in each next header authenticates every block's Sapling, Orchard and Ironwood roots.</p></div>
+      <div class="link"><span class="tag">Notes</span><h3>Tree states reproduced</h3><p>A Ring's note commitments, appended to its start, must reproduce those roots. That authenticates every tree state inside it.</p></div>
+    </div>
+    <p class="chain-note">A tampered block fails at the first check it touches, with a typed reason such as <span class="mono">TxIdMismatch</span> or <span class="mono">TreeRootMismatch</span>. The wallet only ever sees blocks that passed.</p>
+  </section>
+
+  <section id="rings">
+    <div class="split">
+      <div class="stack">
+        <p class="eyebrow">Rings</p>
+        <h2>History travels as Rings, and any host will do.</h2>
+        <p class="lede">A Ring holds one epoch of 4,096 blocks: compact blocks, the digests that rebuild their transaction IDs, and the state to start checking from. Rings are named by their hash and rebuilt byte for byte by any builder, so a CDN, a mirror or a friend's server can host them. Hosts cannot alter authenticated data undetected, but they can withhold it or replay older valid data.</p>
+      </div>
+      <div class="numbers">
+        <div><b class="mono">4,096</b><span>blocks per Ring, about 28 hours at NU7's 25-second blocks</span></div>
+        <div><b class="mono">~7 MB</b><span>for a recent testnet Ring, compressed</span></div>
+        <div><b class="mono">Identical</b><span>bytes from two independent builds of the same Rings</span></div>
+        <div><b class="mono">1 URL</b><span>an unmodified wallet switches by changing its server address</span></div>
+      </div>
+    </div>
+    <div class="procs" style="margin-top:44px">
+      <div class="proc">
+        <div class="proc-head">
+          <h3>Ring files</h3>
+          <p>A builder turns blocks from any node into sealed, self-checking files.</p>
+          <span class="cadence">a new Ring about every 28 h</span>
+        </div>
+        <figure class="diagram">
+          <svg class="dg" viewBox="0 0 1000 420" role="img" aria-label="Rings are cut every 4,096 blocks from the upgrade's activation and sealed once 100 blocks deep; each Ring file holds a start state, every block's header, compact block and digests, the next header and a trailer, and is named by its hash">
+            <defs><marker id="d1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>
+            <text class="m" x="40" y="58">4,514,178</text>
+            <text class="m" x="254" y="58">4,518,274</text>
+            <text class="m" x="468" y="58">4,522,370</text>
+            <text class="m" x="682" y="58">4,526,466</text>
+            <rect class="box" x="40" y="68" width="210" height="24" rx="4"/>
+            <rect class="box" x="254" y="68" width="210" height="24" rx="4"/>
+            <rect class="hi" x="468" y="68" width="210" height="24" rx="4"/>
+            <rect class="dash" x="682" y="68" width="188" height="24" rx="4"/>
+            <text class="s" x="145" y="84" text-anchor="middle">sealed Ring</text>
+            <text class="s" x="359" y="84" text-anchor="middle">sealed Ring</text>
+            <text class="t2" x="573" y="84" text-anchor="middle">this Ring · 4,096 blocks</text>
+            <text class="s" x="776" y="84" text-anchor="middle">open tail</text>
+            <path class="hot" d="M876 80l10 -7v14z"/>
+            <text class="m" x="892" y="84">tip</text>
+            <path class="line" d="M800 100v6H870v-6"/>
+            <text class="s" x="40" y="122">Cut every 4,096 blocks from the upgrade's activation height</text>
+            <text class="s" x="870" y="124" text-anchor="end">sealed once its last block is 100 deep</text>
+            <path class="thin" d="M468 92 L40 160 M678 92 L930 160"/>
+
+            <rect class="box" x="40" y="160" width="890" height="140" rx="8"/>
+            <text class="s" x="52" y="178">start</text>
+            <text class="s" x="194" y="178">block 4,522,370</text>
+            <text class="s" x="336" y="178">block 4,522,371</text>
+            <text class="s" x="532" y="178">block 4,526,465</text>
+            <text class="s" x="674" y="178">after the last block</text>
+            <text class="s" x="816" y="178">end</text>
+            <rect class="soft" x="52" y="184" width="130" height="108" rx="4"/>
+            <text class="t" x="62" y="206">Start state</text>
+            <text class="s" x="62" y="226">tree frontiers</text>
+            <text class="s" x="62" y="244">history peaks</text>
+            <text class="s" x="62" y="262">from the last Ring</text>
+            <rect class="soft" x="194" y="184" width="130" height="28" rx="4"/><text class="m" x="204" y="202">header</text>
+            <rect class="soft" x="194" y="216" width="130" height="36" rx="4"/><text class="m" x="204" y="238">compact block</text>
+            <rect class="hi" x="194" y="256" width="130" height="36" rx="4"/><text class="m" x="204" y="278">digests</text>
+            <rect class="soft" x="336" y="184" width="130" height="28" rx="4"/><text class="m" x="346" y="202">header</text>
+            <rect class="soft" x="336" y="216" width="130" height="36" rx="4"/><text class="m" x="346" y="238">compact block</text>
+            <rect class="hi" x="336" y="256" width="130" height="36" rx="4"/><text class="m" x="346" y="278">digests</text>
+            <text class="t" x="498" y="242" text-anchor="middle">…</text>
+            <rect class="soft" x="532" y="184" width="130" height="28" rx="4"/><text class="m" x="542" y="202">header</text>
+            <rect class="soft" x="532" y="216" width="130" height="36" rx="4"/><text class="m" x="542" y="238">compact block</text>
+            <rect class="hi" x="532" y="256" width="130" height="36" rx="4"/><text class="m" x="542" y="278">digests</text>
+            <rect class="soft" x="674" y="184" width="130" height="108" rx="4"/>
+            <text class="t" x="684" y="206">Next header</text>
+            <text class="s" x="684" y="226">authenticates</text>
+            <text class="s" x="684" y="244">the last block's</text>
+            <text class="s" x="684" y="262">tree roots</text>
+            <rect class="soft" x="816" y="184" width="102" height="108" rx="4"/>
+            <text class="t" x="826" y="206">Trailer</text>
+            <text class="s" x="826" y="226">file hash</text>
+
+            <text class="m" x="40" y="330">ring-4522370-4526465-9bd762020e0052b1.zst</text>
+            <text class="s" x="40" y="350">about 7 MB, named by the hash of its bytes. Digests: a few hundred bytes</text>
+            <text class="s" x="40" y="368">per transaction that rebuild its ID from compact data (v4 transactions travel whole).</text>
+            <rect class="box" x="600" y="330" width="110" height="30" rx="6"/><text class="s" x="655" y="350" text-anchor="middle">Builder A</text>
+            <rect class="box" x="600" y="374" width="110" height="30" rx="6"/><text class="s" x="655" y="394" text-anchor="middle">Builder B</text>
+            <path class="line" d="M710 345 H750 V366 H786" marker-end="url(#d1a)"/>
+            <path class="line" d="M710 389 H750 V368"/>
+            <rect class="hi" x="790" y="350" width="140" height="34" rx="6"/>
+            <text class="t2" x="860" y="372" text-anchor="middle">identical file</text>
+          </svg>
+          <figcaption>Anyone can host a Ring because the wallet re-checks every block in it, and anyone can rebuild one to check a host's copy.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="proofs">
+    <div class="split">
+      <div class="stack">
+        <p class="eyebrow">Header proofs</p>
+        <h2>One shared proof replaces historical header verification.</h2>
+        <p class="lede">Headers are 1,487 bytes each, gigabytes since NU5. Zylem proves the header chain in the SP1 zkVM instead: leaves of 512 headers each check every rule with full Equihash, and recursive aggregation joins them into one proof that commits to each block's record. A wallet checks that proof and the Rings it downloads, and never fetches a historical header.</p>
+        <p class="note">Measured on an RTX 5090 and an M2 Pro laptop. The mainnet cost is a projection from those runs.</p>
+      </div>
+      <div class="numbers">
+        <div><b class="mono">1.88/s</b><span>headers proved per second with Equihash on one RTX 5090</span></div>
+        <div><b class="mono">~$323</b><span>to prove every mainnet header since NU5, at $1.19 an hour</span></div>
+        <div><b class="mono">0.8 MB</b><span>a compressed SP1 proof (1.27 MB measured) after zstd; the size is constant</span></div>
+        <div><b class="mono">No setup</b><span>no trusted setup behind the proof wallets verify</span></div>
+      </div>
+    </div>
+    <div class="procs" style="margin-top:44px">
+      <div class="proc">
+        <div class="proc-head">
+          <h3>Header proof</h3>
+          <p>GPU provers replace every historical header with one proof.</p>
+          <span class="cadence">a new leaf about every 3.6 h</span>
+        </div>
+        <figure class="diagram">
+          <svg class="dg" viewBox="0 0 1000 470" role="img" aria-label="Leaves of 512 headers are proved in SP1, joined pairwise into one history proof, and each new leaf is appended to make a new history proof of the same size">
+            <defs>
+              <marker id="d2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+              <marker id="d2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah2" d="M0 0L10 5L0 10z"/></marker>
+              <pattern id="hdr" width="8" height="16" patternUnits="userSpaceOnUse"><rect class="tick" x="0" y="0" width="5" height="16"/></pattern>
+            </defs>
+            <rect class="soft" x="40" y="24" width="330" height="92" rx="8"/>
+            <text class="t" x="56" y="50">A leaf proves, for each header, in SP1</text>
+            <text class="s" x="56" y="72">link · encoding · Equihash · target</text>
+            <text class="s" x="56" y="90">difficulty rule · median time · work</text>
+            <text class="s" x="56" y="108">and commits the block's record</text>
+            <rect class="soft" x="630" y="24" width="330" height="92" rx="8"/>
+            <text class="t" x="646" y="50">What every proof states</text>
+            <text class="s" x="646" y="72">first and last block, difficulty context</text>
+            <text class="s" x="646" y="90">total work, Equihash checked</text>
+            <text class="s" x="646" y="108">a commitment to every block's record</text>
+            <path class="thin" d="M790 116 V140"/>
+
+            <rect class="box" x="300" y="160" width="180" height="50" rx="8"/>
+            <text class="t" x="390" y="182" text-anchor="middle">History proof</text>
+            <text class="s" x="390" y="200" text-anchor="middle">headers 1–2,048</text>
+            <path class="line" d="M480 176 H686" marker-end="url(#d2a)"/>
+            <text class="s" x="583" y="168" text-anchor="middle">append, 2.2 s</text>
+            <rect class="hi" x="690" y="140" width="200" height="60" rx="8"/>
+            <text class="t" x="790" y="164" text-anchor="middle">New history proof</text>
+            <text class="s" x="790" y="184" text-anchor="middle">headers 1–2,560, same size</text>
+
+            <path class="line" d="M210 250 V232 H350 V210"/>
+            <path class="line" d="M570 250 V232 H430 V210"/>
+            <rect class="box" x="140" y="250" width="140" height="44" rx="8"/>
+            <text class="t" x="210" y="270" text-anchor="middle">Join</text>
+            <text class="s" x="210" y="286" text-anchor="middle">checks they meet</text>
+            <rect class="box" x="500" y="250" width="140" height="44" rx="8"/>
+            <text class="t" x="570" y="270" text-anchor="middle">Join</text>
+            <text class="s" x="570" y="286" text-anchor="middle">checks they meet</text>
+            <path class="line" d="M120 330 V312 H180 V294 M300 330 V312 H240 V294 M480 330 V312 H540 V294 M660 330 V312 H600 V294"/>
+
+            <rect class="box" x="40" y="330" width="160" height="44" rx="8"/><text class="t" x="120" y="350" text-anchor="middle">Leaf</text><text class="s" x="120" y="366" text-anchor="middle">1 to 512</text>
+            <rect class="box" x="220" y="330" width="160" height="44" rx="8"/><text class="t" x="300" y="350" text-anchor="middle">Leaf</text><text class="s" x="300" y="366" text-anchor="middle">513 to 1,024</text>
+            <rect class="box" x="400" y="330" width="160" height="44" rx="8"/><text class="t" x="480" y="350" text-anchor="middle">Leaf</text><text class="s" x="480" y="366" text-anchor="middle">1,025 to 1,536</text>
+            <rect class="box" x="580" y="330" width="160" height="44" rx="8"/><text class="t" x="660" y="350" text-anchor="middle">Leaf</text><text class="s" x="660" y="366" text-anchor="middle">1,537 to 2,048</text>
+            <rect class="hi" x="790" y="330" width="160" height="44" rx="8"/><text class="t" x="870" y="350" text-anchor="middle">New leaf</text><text class="s" x="870" y="366" text-anchor="middle">2,049 to 2,560</text>
+            <path class="acc" d="M870 330 V206" marker-end="url(#d2b)"/>
+
+            <rect x="40" y="398" width="700" height="16" fill="url(#hdr)"/>
+            <rect x="790" y="398" width="160" height="16" fill="url(#hdr2)"/>
+            <defs><pattern id="hdr2" width="8" height="16" patternUnits="userSpaceOnUse"><rect class="tick2" x="0" y="0" width="5" height="16"/></pattern></defs>
+            <path class="thin" d="M120 374 V398 M300 374 V398 M480 374 V398 M660 374 V398 M870 374 V398"/>
+            <text class="s" x="40" y="438">Headers at least 100 blocks deep, in leaves of 512 counted from the upgrade height. Leaves are independent,</text>
+            <text class="s" x="40" y="456">so many GPUs prove them at once: about 4.5 minutes per leaf on one RTX 5090.</text>
+          </svg>
+          <figcaption>A join is itself a proof: SP1 verifies the two child proofs inside it, so the history proof never grows, however many leaves it covers.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="verify">
+    <div class="head">
+      <p class="eyebrow">Verification</p>
+      <h2>The client checks everything before the wallet scans it.</h2>
+      <p class="lede">Built by anyone, independently checked by clients. The wallet, or the Zylem proxy beside it, starts from what it ships with and works outward.</p>
+    </div>
+    <div class="procs">
+      <div class="proc">
+        <div class="proc-head">
+          <h3>Verification</h3>
+          <p>The wallet, or the proxy beside it, checks everything before scanning it.</p>
+          <span class="cadence">every sync</span>
+        </div>
+        <figure class="diagram">
+          <svg class="dg" viewBox="0 0 1000 470" role="img" aria-label="The wallet starts from what it ships with, verifies the history proof, binds each Ring's records to it, checks the Ring's contents against those records, and checks the newest headers and the tip itself; only data that passes reaches the scanner">
+            <defs><marker id="d3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>
+            <text class="k" x="40" y="132">SHIPPED IN THE APP</text>
+            <text class="k" x="230" y="132">FROM ANY HOST</text>
+            <rect class="soft" x="40" y="146" width="160" height="104" rx="8"/>
+            <text class="t" x="54" y="172">Trust anchor</text>
+            <text class="s" x="54" y="194">program keys</text>
+            <text class="s" x="54" y="212">checkpoint block</text>
+            <text class="s" x="54" y="230">minimum chain work</text>
+            <path class="line" d="M200 198 H226" marker-end="url(#d3a)"/>
+            <rect class="box" x="230" y="146" width="180" height="104" rx="8"/>
+            <text class="t" x="244" y="172">History proof</text>
+            <text class="s" x="244" y="194">verified in 37.6 ms</text>
+            <text class="s" x="244" y="212">gives the last block and</text>
+            <text class="s" x="244" y="230">the records commitment</text>
+            <path class="line" d="M410 198 H436" marker-end="url(#d3a)"/>
+            <rect class="box" x="440" y="146" width="180" height="104" rx="8"/>
+            <text class="t" x="454" y="172">Ring records</text>
+            <text class="s" x="454" y="194">bound to the proof</text>
+            <text class="s" x="454" y="212">with a few hashes; give</text>
+            <text class="s" x="454" y="230">each block's roots</text>
+            <path class="line" d="M620 198 H646" marker-end="url(#d3a)"/>
+            <rect class="box" x="650" y="146" width="190" height="104" rx="8"/>
+            <text class="t" x="664" y="172">Ring contents</text>
+            <text class="s" x="664" y="194">transaction IDs rebuilt,</text>
+            <text class="s" x="664" y="212">hashed to the Merkle root;</text>
+            <text class="s" x="664" y="230">tree states reproduced</text>
+            <path class="line" d="M840 198 H880" marker-end="url(#d3a)"/>
+            <rect class="phone" x="884" y="150" width="56" height="96" rx="10"/>
+            <rect class="screen" x="892" y="162" width="40" height="66" rx="4"/>
+            <path class="check" d="M901 196 l7 7 l13 -15"/>
+            <text class="t" x="912" y="274" text-anchor="middle">Scanner</text>
+            <text class="s" x="912" y="292" text-anchor="middle">verified data only</text>
+
+            <text class="k" x="440" y="334">PAST THE PROOF</text>
+            <path class="line" d="M320 250 V384 H436" marker-end="url(#d3a)"/>
+            <text class="s" x="330" y="374">its last block</text>
+            <rect class="box" x="440" y="346" width="180" height="76" rx="8"/>
+            <text class="t" x="454" y="370">Newest headers</text>
+            <text class="s" x="454" y="390">checked here: Equihash,</text>
+            <text class="s" x="454" y="408">difficulty, time</text>
+            <path class="line" d="M620 384 H646" marker-end="url(#d3a)"/>
+            <rect class="box" x="650" y="346" width="190" height="76" rx="8"/>
+            <text class="t" x="664" y="370">Tip policy</text>
+            <text class="s" x="664" y="390">minimum work, confirmed</text>
+            <text class="s" x="664" y="408">by two or more sources</text>
+            <path class="line" d="M840 384 H984 V198 H944" marker-end="url(#d3a)"/>
+
+            <text class="s" x="40" y="54">Each box authenticates the next: the wallet starts from what it ships with and never takes a</text>
+            <text class="s" x="40" y="72">server's word. A failed check rejects that data with a reason, so the scanner never sees it.</text>
+          </svg>
+          <figcaption>Two paths reach the scanner: history through the proof and the Rings, and the newest blocks through direct checks and the tip policy.</figcaption>
+        </figure>
+      </div>
+    </div>
+    <div class="values">
+      <div class="value"><h3>No trusted Ring builder or proof producer</h3><p>Anyone can run a builder or a prover. A wrong Ring or a wrong proof fails verification on the wallet's side, so nobody has to vouch for them.</p></div>
+      <div class="value"><h3>Builders keep each other honest</h3><p>Builds are deterministic. Two independent builders publish the same Ring hashes, and any difference is visible at once.</p></div>
+      <div class="value"><h3>Cheap to serve</h3><p>Static files on any CDN. Serving more wallets adds bandwidth, not nodes, databases or per-user servers.</p></div>
+      <div class="value"><h3>Pay once, then pennies</h3><p>Proving every mainnet header since NU5 is projected at about $323 of GPU time. Keeping up is about $0.30 for a short GPU run every 12 hours.</p></div>
+      <div class="value"><h3>Light for wallets</h3><p>One proof of about 0.8 MB replaces 1,487 bytes of header per block, gigabytes since NU5. Wallets download only the Rings they need.</p></div>
+      <div class="value"><h3>Natively verified live tail</h3><p>Proofs cover only blocks at least 100 deep. Ordinary reorganizations touch only the newest blocks, which the wallet checks itself.</p></div>
+    </div>
+    <p class="note" style="margin-top:28px">Rings are built and proved on testnet today, and the <a href="/demo/">live demo</a> verifies them in your browser. Mainnet costs are projections from these runs.</p>
+  </section>
+
+  <section id="trust">
+    <div class="head">
+      <p class="eyebrow">Trust model</p>
+      <h2>What you still trust, and what you no longer have to.</h2>
+    </div>
+    <div class="trust">
+      <div class="yes">
+        <h3>You trust</h3>
+        <ul>
+          <li>A checkpoint block and the minimum chain work shipped with it</li>
+          <li>The proof system, and the published programs that define the rules</li>
+          <li>That most Zcash hashpower is honest</li>
+        </ul>
+      </div>
+      <div>
+        <h3>You no longer trust</h3>
+        <ul>
+          <li>The light-wallet server you sync from</li>
+          <li>Ring hosts, mirrors and CDNs</li>
+          <li>Whoever produced the header proof</li>
+        </ul>
+      </div>
+      <p class="caveat">Servers and hosts can still withhold or delay data, or replay old data that is valid. The tip policy limits that: the newest blocks must carry enough work and agree across independent sources, or the wallet sees an error instead of a weak chain.</p>
+    </div>
+  </section>
+
+  <section id="sources">
+    <div class="head">
+      <p class="eyebrow">Measurements</p>
+      <h2>Where each number comes from.</h2>
+      <p class="lede">Every figure on these pages comes from a run recorded in the Zylem repository. Mainnet costs are projections from testnet runs.</p>
+    </div>
+    <ul class="facts-list">
+      <li><b>29,571 blocks in about 9 s</b><span>Native Ring verification on testnet, M2 Pro. <span class="mono">docs/phase0.md</span>, <span class="mono">zylem-build verify</span></span></li>
+      <li><b>1,550,559 headers</b><span>Testnet replay from NU6 across NU7, with Zakura's checkpoints and rules. <span class="mono">docs/phase3.md</span></span></li>
+      <li><b>1.88 headers/s</b><span>SP1 leaf of 512 headers with full Equihash on one RTX 5090. <span class="mono">spikes/header-proof/gpu-bench/results/</span></span></li>
+      <li><b>~$323</b><span>Projected GPU cost to prove every mainnet header since NU5, at $1.19 an hour. <span class="mono">spikes/header-proof/README.md</span></span></li>
+      <li><b>37.6 ms</b><span>Compressed SP1 proof verified in WebAssembly under Node, M2 Pro. <span class="mono">spikes/header-proof/wasm-verify/</span></span></li>
+      <li><b>1.27 MB, 804 KB with zstd</b><span>Measured size of a compressed SP1 aggregate proof. Compressed proofs are constant size; a full-history proof has not been produced yet.</span></li>
+    </ul>
+  </section>
+
+  <section id="build">
+    <div class="head">
+      <p class="eyebrow">Build it yourself</p>
+      <h2>Build Rings, prove them, verify them.</h2>
+      <p class="lede">Anyone can run each step, and no client has to trust whoever did. Testnet commands below; mainnet takes <span class="mono">--network main</span>. The full guide is <span class="mono">docs/build.md</span> in the repository.</p>
+    </div>
+
+    <div class="guide">
+      <div class="guide-step">
+        <h3>1 · Build Rings from a node</h3>
+        <p class="detail-p">Needs Rust and a Zakura or zcashd node's JSON-RPC. A pruned Zakura node works: the first build bootstraps once from a light-wallet server for blocks the node has pruned. Rings land in <span class="mono">data/testnet</span> as plain files for any static host, and two builders produce byte-identical files.</p>
+        <div class="cmds">
+        <div class="cmd">
+          <header><span><b>1</b> Build every sealed Ring and the open tail</span><button class="copy" type="button" data-copy="b1">Copy</button></header>
+          <pre id="b1">cargo build --release
+./target/release/zylem-build backfill --rpc http://127.0.0.1:18232/ \
+    --lwd https://testnet.zec.rocks:443 --out data/testnet --finality 100</pre>
+        </div>
+        <div class="cmd">
+          <header><span><b>2</b> Check them as a client does, then host them</span><button class="copy" type="button" data-copy="b2">Copy</button></header>
+          <pre id="b2">./target/release/zylem-build verify data/testnet
+./target/release/zylem-build serve --out data/testnet --rpc http://127.0.0.1:18232/ --finality 100</pre>
+        </div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <h3>2 · Prove the headers in SP1</h3>
+        <p class="detail-p">Needs SP1 6.9.0 (<span class="mono">sp1up</span>) and, for real proofs, an NVIDIA GPU with about 26 GB of memory: an RTX 5090 proves a leaf of 512 headers with Equihash in about 5 minutes. Leaves are independent, so any number of GPUs share the work, and every step is safe to rerun.</p>
+        <div class="cmds">
+        <div class="cmd">
+          <header><span><b>1</b> Cut the chain into leaves of 512 headers, in 4 shards</span><button class="copy" type="button" data-copy="b3">Copy</button></header>
+          <pre id="b3">./target/release/zylem-build jobs --rpc http://127.0.0.1:18232/ \
+    --activation 4465026 --shards 4 --out data/jobs/nu7
+spikes/header-proof/pipeline/pack.sh data/jobs/nu7</pre>
+        </div>
+        <div class="cmd">
+          <header><span><b>2</b> On each GPU machine: prove a shard</span><button class="copy" type="button" data-copy="b4">Copy</button></header>
+          <pre id="b4">zylem/spikes/header-proof/pipeline/setup.sh
+zylem/spikes/header-proof/pipeline/run-shard.sh 0</pre>
+        </div>
+        <div class="cmd">
+          <header><span><b>3</b> Join the shards into one history proof, and wrap it for contracts</span><button class="copy" type="button" data-copy="b5">Copy</button></header>
+          <pre id="b5">zylem/spikes/header-proof/pipeline/join.sh ~/out ~/out/shard-0.proof ~/out/shard-1.proof \
+    ~/out/shard-2.proof ~/out/shard-3.proof --groth16</pre>
+        </div>
+        <div class="cmd">
+          <header><span><b>4</b> Publish the proof, its block records and the Ring bindings</span><button class="copy" type="button" data-copy="b6">Copy</button></header>
+          <pre id="b6">spikes/header-proof/sp1/target/release/export-proof ~/out/history.proof data/proofs/history
+./target/release/zylem-build publish --jobs data/jobs/nu7 --history data/proofs/history \
+    --vks ~/out/vks.json --rings data/testnet --groth16 ~/out/history.groth16.bytes --out data/publish/nu7</pre>
+        </div>
+        </div>
+        <p class="note" style="margin-top:12px">With the program registry (generation 1), set <span class="mono">PROGRAMS=programs/testnet</span> before the pod scripts and publish with <span class="mono">--registry programs/testnet</span>. Without a GPU, <span class="mono">SP1_PROVER=mock</span> runs the same flow and checks every claim.</p>
+      </div>
+
+      <div class="guide-step">
+        <h3>3 · Verify</h3>
+        <div class="scroll">
+          <table class="tbl cards">
+            <thead><tr><th scope="col">Where</th><th scope="col">Use</th><th scope="col">Checks</th></tr></thead>
+            <tbody>
+              <tr><td>An existing wallet</td><td><span class="mono">zylem-proxy</span>, a drop-in light-wallet server</td><td>Every Ring from the checkpoint; the wallet only changes its server address</td></tr>
+              <tr><td>Browsers and phones</td><td>The WebAssembly client in <span class="mono">spikes/header-proof/wasm-verify</span> (1.8 MB)</td><td><span class="mono">RingFile.verify()</span> for a whole Ring; <span class="mono">verify_history</span> or <span class="mono">verify_history_v2</span> for the 1.27 MB proof; <span class="mono">verify_groth16</span> for the 356-byte proof; <span class="mono">check_all_records</span> and <span class="mono">verify_binding</span> to match a Ring to a proof</td></tr>
+              <tr><td>Contracts on EVM chains</td><td>SP1's Groth16 verifier for circuit v6.1.0: <span class="mono">SP1VerifierGroth16.sol</span> from <span class="mono">succinctlabs/sp1-contracts</span></td><td><span class="mono">verifyProof(programKey, publicValues, proof)</span> with Zylem's aggregation key: 303,762 gas in a local EVM. Not deployed on a chain yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cmds" style="margin-top:16px">
+        <div class="cmd">
+          <header><span><b>1</b> Point a wallet at the proxy</span><button class="copy" type="button" data-copy="b7">Copy</button></header>
+          <pre id="b7">./target/release/zylem-proxy --rings http://127.0.0.1:8090 \
+    --headers-rpc http://user:pass@127.0.0.1:18232/ \
+    --upstream https://testnet.zec.rocks:443 \
+    --checkpoint &quot;$(jq -r .checkpoint checkpoints/testnet.json)&quot;
+zcash-devtool wallet -w my-wallet sync --server 127.0.0.1:9067</pre>
+        </div>
+        <div class="cmd">
+          <header><span><b>2</b> Build the WebAssembly client (needs wasm-pack and LLVM's clang)</span><button class="copy" type="button" data-copy="b8">Copy</button></header>
+          <pre id="b8">cd spikes/header-proof/wasm-verify
+wasm-pack build --release --target web --out-dir pkg-web</pre>
+        </div>
+        <div class="cmd">
+          <header><span><b>3</b> Check the 356-byte proof with SP1's contract in a local EVM</span><button class="copy" type="button" data-copy="b9">Copy</button></header>
+          <pre id="b9">cd spikes/header-proof/onchain &amp;&amp; forge test -vv</pre>
+        </div>
+        </div>
+        <p class="note" style="margin-top:12px">Program keys: aggregation <span class="mono">0x007d30f1…876f34cb</span>, leaf <span class="mono">0x00b1908c…85b8daa0</span> (generation 0); generation 1 in <span class="mono">programs/testnet/registry.json</span>. Each path trusts the cryptography, a checkpoint and honest-majority hashpower; proofs add SP1 and these programs, and the 356-byte form adds SP1's Groth16 setup.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="details">
+    <div class="head">
+      <p class="eyebrow">Technical details</p>
+      <h2>Tip policy, inclusion proofs and other chains.</h2>
+    </div>
+    <div class="details">
+      <details>
+        <summary>Tip policy</summary>
+        <p class="detail-p">Valid proof of work alone is not enough: Zcash adjusts difficulty every block, so a private fork can grow cheaply. The proxy presents a tip only when the chain after the checkpoint carries the shipped minimum work, at least two independent sources confirm it, and no verified source shows more blocks beyond it or a heavier fork. Headers dated more than two hours ahead are rejected, and a long silence raises a stale-tip alarm.</p>
+      </details>
+      <details>
+        <summary>Inclusion and absence</summary>
+        <p class="detail-p">The proof commits to every block's record, including its Merkle root, so a transaction's inclusion can be shown with its Merkle path, its record's path and the history proof. Absence is checkable too: a verified Ring authenticates every transaction in each block, so a client holding the Rings for a range can confirm a transaction or nullifier did not appear there. What does not exist yet is a compact proof of absence that could be handed to a contract.</p>
+      </details>
+      <details>
+        <summary>What cross-chain use still needs</summary>
+        <p class="detail-p">The first piece works: SP1's v6.1.0 verifier contract accepts Zylem's 356-byte Groth16 history proof in a local EVM for 303,762 gas, and an example contract reads the claim and stores the proven block hash for 334,361 gas (<span class="mono">spikes/header-proof/onchain</span>). Nothing is deployed on a chain yet. The rest is still to build. A contract cannot ask independent sources for the tip, so it needs a freshness rule, such as accepting only facts a set depth below a proven tip that meets a minimum work, and someone who keeps the on-chain client updated. Wrapping runs on the GPU prover, once per history proof. Checking v5 and v6 transaction IDs on-chain means ZIP 244's BLAKE2b hashing. Facts about a shielded payment's amount or recipient need selective disclosure.</p>
+      </details>
+      </div>
+  </section>
+
+  <footer>
+    <span><a href="/">Zylem</a> · verification for Zcash light wallets</span>
+    <span class="mono">testnet · October 2026</span>
+  </footer>
+</div>
+
+<script>
+document.querySelectorAll('details.menu a').forEach(a => a.addEventListener('click', () => a.closest('details').open = false));
+
+document.querySelectorAll('.copy').forEach(btn => btn.addEventListener('click', () => {
+  const pre = document.getElementById(btn.dataset.copy);
+  const done = msg => { btn.textContent = msg; setTimeout(() => { btn.textContent = 'Copy'; }, 1600); };
+  const select = () => { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Selected'); };
+  try { navigator.clipboard.writeText(pre.textContent).then(() => done('Copied'), select); } catch (e) { select(); }
+}));
+document.querySelectorAll('table.tbl.cards').forEach(t => {
+  const names = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim());
+  for (const tr of t.tBodies[0].rows) [...tr.cells].forEach((c, i) => { if (names[i]) c.dataset.label = names[i]; });
+});
+</script>
